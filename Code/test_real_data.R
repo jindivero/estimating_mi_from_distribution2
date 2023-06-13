@@ -10,7 +10,7 @@ library(mgcv)
 library(here)
 
 brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
-logfun <- function(x, s50, s95, smax) smax * ((1 + exp(-log(19) * (x - s50)/(s95)))^(-1) - 1)
+logfun <- function(x, s50, delta, smax) smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1)
 
 ### Load Data ####
 #here("thresholds_mi_distribution")
@@ -91,7 +91,7 @@ npars <- length(parfit$value)
 parnames <- names(parfit$value)
 
 s50 <- parfit$value[grep("s50", parnames)]
-s95 <- parfit$value[grep("s95", parnames)]
+delta <- parfit$value[grep("s95", parnames)]
 smax <- parfit$value[grep("s_max", parnames)]
 Eo <- parfit$value[grep("Eo", parnames)]
 betas <-  m2$sd_report$par.fixed[grep("b_j", names( m2$sd_report$par.fixed))]
@@ -101,15 +101,15 @@ beta_depth <- betas[(length(betas)-1):length(betas)]
 ##### plot ####
 po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
-plot(po2_prime, exp(logfun(po2_prime, s50, s95, smax)),
+plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
      xlim = c(0,5),
      ylab = "po2-prime marginal effect")
 
 ### Fit logistic po2 model ####
 start <- matrix(0, ncol = 1, nrow = 3)
-start[1, 1] <- -1.22 #s50
-start[2, 1] <- log(-1.22 + 1.5) #s95
-start[3, 1] <- 10 #smax
+start[1, 1] <- -1.5 #s50
+start[2, 1] <- log(0.5) # log delta
+start[3, 1] <- 40 #smax
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_sc)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
@@ -120,12 +120,7 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_sc)+log_depth_scaled+log_depth_s
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
-               newton_loops = 2,
-               eval.max = 1000000L,
-               iter.max = 1000000L,
-               nlminb_loops = 100L,
-               lower = list(b_threshold = c(-Inf, -Inf, 0)),
-               upper= list(b_threshold=c(Inf, Inf, Inf))
+               newton_loops = 2
              ))
 summary(m3)
 
@@ -137,11 +132,12 @@ npars <- length(parfit$value)
 parnames <- names(parfit$value)
 
 s50 <- parfit$value[grep("s50", parnames)]
-s95 <- exp(parfit$value[grep("s95", parnames)] )
+s95 <- (parfit$value[grep("s95", parnames)] )
+delta <- s95 - s50
 smax <- parfit$value[grep("s_max", parnames)]
 
 ##### plot ####
-plot(dat$po2, exp(logfun(dat$po2_sc, s50, s95, smax)),
+plot(dat$po2, exp(logfun(dat$po2_sc, s50, delta, smax)),
      xlim = c(0,5),
      ylab = "po2 marginal effect")
 
