@@ -1,6 +1,14 @@
 ### Install packages ####
-remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+#remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+
+
+#install.packages("devtools")
+#library(devtools)
+#install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+#library(INLA)
+devtools::install_local("/Users/jindiv/Dropbox/GitHub/sdmTMB-mi.zip")
 library(sdmTMB)
+
 library(ggplot2)
 library(visreg)
 library(ggeffects)
@@ -14,8 +22,8 @@ logfun <- function(x, s50, delta, smax) smax * ((1 + exp(-log(19) * (x - s50)/(d
 
 ### Load Data ####
 #here("thresholds_mi_distribution")
-#setwd("~/Dropbox/Mac/Documents/GitHub/thresholds_mi_distribution/thresholds_mi_distribution")
-dat <- readRDS("data/data_sablefish2.rds")
+setwd("/Users/jindiv/Dropbox/GitHub/estimating_mi_from_distribution2")
+dat <- readRDS("data_sablefish2.rds")
 
 ### Calculate inverse temp ####
 kelvin = 273.15 #To convert to Kelvin
@@ -55,6 +63,8 @@ b_threshold <- m1_pars[grep("b_threshold", m1_parnames)]
 ##### plot ####
 plot(dat$po2, exp(sapply(X = dat$po2_sc, FUN = brkptfun, b_slope = b_threshold[1], b_thresh = b_threshold[2])),
      ylab = "po2 marginal effect", 
+     main="Breakpoint-pO2",
+     xlab="pO2",
      xlim = c(0,5),)
 
 
@@ -103,6 +113,7 @@ po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
 plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
      xlim = c(0,5),
+     main="Eo estimation and logistic pO2'",
      ylab = "po2-prime marginal effect")
 
 ### Fit logistic po2 model ####
@@ -138,8 +149,11 @@ smax <- parfit$value[grep("s_max", parnames)]
 
 ##### plot ####
 plot(dat$po2, exp(logfun(dat$po2_sc, s50, delta, smax)),
+     main="Logistic-pO2",
      xlim = c(0,5),
-     ylab = "po2 marginal effect")
+     ylab = "po2 marginal effect",
+     xlab="pO2"
+     )
 
 ### Fit null model ####
 m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
@@ -158,3 +172,52 @@ m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2,
              )
 summary(m4)
 AIC(m4)
+
+### Create dAIC table ###
+## Make list of model names##
+models <- c("breakpt-pO2", "Eo estimation and logistic po2'", "logistic-pO2", "Null")
+## Create table and add AIC for each ##
+AIC <- as.data.frame(matrix(NA, ncol = 1, nrow = 4, dimnames = list(models)))
+AIC[1,] <- AIC(m1)
+AIC[2,] <- AIC(m2)
+AIC[3,] <- AIC(m3)
+AIC[4,] <- AIC(m4)
+## Calculate delta-AIC ##
+AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
+
+### Plot depth effects ###
+## Set ggplot theme ##
+theme_set(theme_bw(base_size = 30))
+theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+## Internal Eo mode ##
+# Extract parameters another way for internal Eo model #
+par_estimates <- as.data.frame(tidy(m2, conf.int = TRUE, effects="fixed"))
+par_estimates_rand <- as.data.frame(tidy(m2, conf.int = TRUE, effects="ran_pars"))
+par_estimates <- bind_rows(par_estimates, par_estimates_rand)
+pars <- par_estimates[1:2]
+pars <- pivot_wider(pars, names_from=term, values_from=estimate)
+# Calculate temp-corrected po2 from Eo value #
+dat$mi_pred <- dat$po2*exp(pars$"mi-Eo"* dat$invtemp)
+# Calculate effect of MI #
+dat$mi_effect <- pars$"mi-smax" * (1 / (1 + exp(-log(19) * (dat$mi_pred - pars$`mi-s50`) / pars$"mi-delta")) - 1)
+# Calculate combined depth effect #
+dat$depth_effect_combined <- (dat$log_depth_scaled*pars$log_depth_scaled)+(dat$log_depth_scaled2*pars$log_depth_scaled2)
+
+## For breakpt(o2) model ##
+par_estimates2 <- as.data.frame(tidy(m1, conf.int = TRUE, effects="fixed"))
+par_estimates_rand2 <- as.data.frame(tidy(m1, conf.int = TRUE, effects="ran_pars"))
+par_estimates2 <- bind_rows(par_estimates2, par_estimates_rand2)
+pars2 <- par_estimates2[1:2]
+pars2 <- pivot_wider(pars2, names_from=term, values_from=estimate)
+# alculate depth effects #
+dat$depth_effect_combined2 <- (dat$log_depth_scaled*pars2$log_depth_scaled)+(dat$log_depth_scaled2*pars2$log_depth_scaled2)
+# Calculate po2 effect #
+dat$po2_effect <- ifelse(dat$po2_sc>pars2$`po2_sc-breakpt`,pars2$`po2_sc-breakpt`*pars2$`po2_sc-slope`,dat$`po2_sc`*pars2$`po2_sc-slope`)
+
+# Plot depth effects compared between model #
+ggplot(dat, aes(y=depth_effect_combined, x=depth))+geom_line(size=1.3)+geom_line(dat, mapping=aes(y=depth_effect_combined2, x=depth), color="red", size=1.3)+ylab("Depth Effect Combined")
+ggplot(subset(dat, depth>450), aes(y=depth_effect_combined, x=depth))+geom_point()+geom_point(subset(dat, depth>450), mapping=aes(y=depth_effect_combined2, x=depth), color="red")+ylab("Depth Effect Combined")
+
+# Plot metabolic index vs depth #
+ggplot(dat, aes(y=depth, x=mi_pred))+geom_point(aes(color=log(cpue_kg_km2)))+xlab("pO2'")+theme(legend.position=c(0.8, 0.8))
+
