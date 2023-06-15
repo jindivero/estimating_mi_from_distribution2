@@ -67,6 +67,9 @@ plot(dat$po2, exp(sapply(X = dat$po2_sc, FUN = brkptfun, b_slope = b_threshold[1
      xlab="pO2",
      xlim = c(0,5),)
 
+## Identify number below threshold ##
+dat$po2_prime <- po2_prime
+dat_below2 <- subset(dat, po2 < exp(-1.09))
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
@@ -114,6 +117,60 @@ po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
      xlim = c(0,5),
      main="Eo estimation and logistic pO2'",
+     ylab = "po2-prime marginal effect")
+
+## Identify number below threshold ##
+dat$po2_prime <- po2_prime
+dat_below <- subset(dat, po2_prime<1)
+
+### Fit Eo estimation - po2 prime model (with prior) ####
+#Set starting parameters: 
+
+start <- matrix(0, ncol = 1, nrow = 4)
+start[1, 1] <- 2 #s50
+start[2, 1] <- (1) #delta
+start[3, 1] <- 10 #smax (ie beta_3)
+start[4, 1] <- 0.68 #Eo
+m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+             data = dat, 
+             time = NULL,
+             reml = F,
+             anisotropy = TRUE,
+             spatiotemporal = FALSE,
+             mesh=mesh,
+             family =tweedie(link="log"),
+             priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))),
+             control = sdmTMBcontrol(
+               start = list(b_threshold = start),
+               lower = list(b_threshold = c(-Inf, -Inf, 0, 0)), upper = list(b_threshold = c(Inf, Inf,50, Inf)),
+               newton_loops = 1))
+
+summary(m2a)
+AIC(m2a)
+
+#### Plot fitted relationshop ####
+##### extract estimates ####
+
+re2a <- m2a$tmb_random
+parfit <- m2a$sd_report
+npars <- length(parfit$value)
+parnames <- names(parfit$value)
+
+s50 <- parfit$value[grep("s50", parnames)]
+delta <- parfit$value[grep("s95", parnames)]
+smax <- parfit$value[grep("s_max", parnames)]
+Eo <- parfit$value[grep("Eo", parnames)]
+betas <-  m2a$sd_report$par.fixed[grep("b_j", names( m2a$sd_report$par.fixed))]
+
+beta_depth <- betas[(length(betas)-1):length(betas)]
+
+##### plot ####
+## Calculate po2 prime from parameter ##
+po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
+
+plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
+     xlim = c(0,5),
+     main="Eo estimation and logistic pO2 (with prior)'",
      ylab = "po2-prime marginal effect")
 
 ### Fit logistic po2 model ####
@@ -175,13 +232,14 @@ AIC(m4)
 
 ### Create dAIC table ###
 ## Make list of model names##
-models <- c("breakpt-pO2", "Eo estimation and logistic po2'", "logistic-pO2", "Null")
+models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null")
 ## Create table and add AIC for each ##
-AIC <- as.data.frame(matrix(NA, ncol = 1, nrow = 4, dimnames = list(models)))
+AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =5, dimnames = list(models)))
 AIC[1,] <- AIC(m1)
 AIC[2,] <- AIC(m2)
-AIC[3,] <- AIC(m3)
-AIC[4,] <- AIC(m4)
+AIC[3,] <- AIC(m2a)
+AIC[4,] <- AIC(m3)
+AIC[5,] <- AIC(m4)
 ## Calculate delta-AIC ##
 AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
 
