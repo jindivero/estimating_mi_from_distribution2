@@ -1,0 +1,348 @@
+library(sp)
+library(ggplot2)
+library(broom)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(KernSmooth)
+library(sdmTMB)
+library(ggplot2)
+library(visreg)
+library(ggeffects)
+library(mgcv)
+library(here)
+  
+  
+# calc o2 solubility, relies on o2 in umol/kg
+gsw_O2sol_SP_pt <- function(sal,pt) {
+  x = sal
+  pt68 = pt*1.00024
+  y = log((298.15 - pt68)/(273.15 + pt68))
+  
+  a0 =  5.80871
+  a1 =  3.20291
+  a2 =  4.17887
+  a3 =  5.10006
+  a4 = -9.86643e-2
+  a5 =  3.80369
+  b0 = -7.01577e-3
+  b1 = -7.70028e-3
+  b2 = -1.13864e-2
+  b3 = -9.51519e-3
+  c0 = -2.75915e-7
+  
+  O2sol = exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
+  return(O2sol)
+}
+
+load_all_hauls <- function() {
+  install.packages("remotes")
+  remotes::install_github("nwfsc-assess/nwfscSurvey")
+  haul = nwfscSurvey::PullHaul.fn(SurveyName = "NWFSC.Combo")
+  haul <- plyr::rename(haul, replace=c("salinity_at_gear_psu_der" = "sal", 
+                                       "temperature_at_gear_c_der" = "temp", 
+                                       "o2_at_gear_ml_per_l_der" = "o2",
+                                       "depth_hi_prec_m" = "depth"))
+  
+  # read in the grid cell data from the survey design
+  grid_cells = readxl::read_excel("data/Selection Set 2018 with Cell Corners.xlsx")
+  grid_cells = dplyr::mutate(grid_cells,
+                             depth_min = as.numeric(unlist(strsplit(grid_cells$Depth.Range,"-"))[1]),
+                             depth_max = as.numeric(unlist(strsplit(grid_cells$Depth.Range,"-"))[2]))
+  
+  # convert grid_cells to sp object
+  grid = SpatialPoints(cbind(grid_cells$Cent.Long,grid_cells$Cent.Lat),
+                       proj4string = CRS("+proj=longlat +datum=WGS84"))
+  r = raster::rasterize(x=grid, y = raster(nrow=length(unique(grid_cells$Cent.Lat)),
+                                           ncol=length(unique(grid_cells$Cent.Long))))
+  rasterToPoints(r)
+  
+  raster = aggregate(r, fact = 2)
+  raster = projectRaster(raster, crs = "+proj=tmerc +lat_0=31.96 +lon_0=-121.6 +k=1 +x_0=390000 +y_0=0 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+  
+  # create matrix of point data with coordinates and depth from raster
+  grid = as.data.frame(rasterToPoints(raster))
+  
+  # Figure out the grid cell corresponding to each tow location
+  haul$Cent.Lat = NA
+  haul$Cent.Lon = NA
+  haul$Cent.ID = NA
+  for(i in 1:nrow(haul)) {
+    indx = which(grid_cells$NW.LAT > haul$latitude_dd[i] &
+                   grid_cells$SW.LAT < haul$latitude_dd[i] &
+                   grid_cells$NW.LON < haul$longitude_dd[i] &
+                   grid_cells$NE.LON > haul$longitude_dd[i])
+    if(length(indx) > 0) {
+      haul$Cent.ID[i] = grid_cells$Cent.ID[indx]
+      haul$Cent.Lat[i] = grid_cells$Cent.Lat[indx]
+      haul$Cent.Lon[i] = grid_cells$Cent.Long[indx]
+    }
+  }
+  
+  # project lat/lon to UTM, after removing missing values and unsatisfactory hauls
+  haul = haul %>% filter(!is.na(Cent.Lon), performance == "Satisfactory")
+  
+  haul_trans = haul
+  coordinates(haul_trans) <- c("Cent.Lon", "Cent.Lat")
+  proj4string(haul_trans) <- CRS("+proj=longlat +datum=WGS84")
+  newproj = paste("+proj=utm +zone=10 ellps=WGS84")
+  haul_trans <- spTransform(haul_trans, CRS(newproj))
+  haul_trans = as.data.frame(haul_trans)
+  haul_trans$Cent.Lon = haul_trans$Cent.Lon/10000
+  haul_trans$Cent.Lat = haul_trans$Cent.Lat/10000
+  haul_trans$year = as.numeric(substr(haul_trans$date_yyyymmdd,1,4))
+  
+  haul$X = haul_trans$Cent.Lon
+  haul$Y = haul_trans$Cent.Lat
+  haul$year = haul_trans$year
+  #haul$year_centered = haul$year - mean(unique(haul$year))
+  
+  return(haul)
+  
+  
+}
+
+calc_po2_mi <- function(dat) {
+  #O2 from trawl data is in ml/l - may need to be converted to umol/kg
+  gas_const = 8.31
+  partial_molar_vol = 0.000032
+  kelvin = 273.15
+  boltz = 0.000086173324
+  
+  #calculate percent saturation for O2 - assumes  units of mL O2/L
+  # Input:       S = Salinity (pss-78)
+  #              T = Temp (deg C) ! use potential temp
+  #depth is in meters
+  #[umole/kg] = [ml/L]*44660/(sigmatheta(P=0,theta,S) + 1000)
+  dat$SA = gsw_SA_from_SP(dat$sal,dat$depth,dat$longitude_dd,dat$latitude_dd) #absolute salinity for pot T calc
+  dat$pt = gsw_pt_from_t(dat$SA,dat$temp,dat$depth) #potential temp at a particular depth
+  dat$CT = gsw_CT_from_t(dat$SA,dat$temp,dat$depth) #conservative temp
+  dat$sigma0 = gsw_sigma0(dat$SA,dat$CT)
+  dat$o2_umolkg = dat$o2*44660/(dat$sigma0+1000)
+  
+  
+  dat$O2_Sat0 = gsw_O2sol_SP_pt(dat$sal,dat$pt)
+  
+  #= o2satv2a(sal,pt) #uses practical salinity and potential temp - solubity at p =1 atm
+  dat$press = exp(dat$depth*10000*partial_molar_vol/gas_const/(dat$temp+kelvin))
+  dat$O2_satdepth = dat$O2_Sat0*dat$press
+  
+  #solubility at p=0
+  dat$sol0 = dat$O2_Sat0/0.209
+  dat$sol_Dep = dat$sol0*dat$press
+  dat$po2 = dat$o2_umolkg/dat$sol_Dep
+  dat$po2 <- dat$po2 * 101.325 # convert to kPa
+  
+  # species-specific parameters, estimated by fitting linear model to all data in Deutsch (fish only)
+  #Eo <- 0.4480175
+  Eo <- 1.3
+  Ao <- 4.4733481
+  n <- -0.2201635
+  avgbn <- 0.112  # this works for the adult class (0.5 - 6 kg).  for the large adult, adjust
+  inv.temp <- (1 / boltz) * ( 1 / (dat$temp + kelvin) - 1 / (15 + kelvin))
+  dat$mi = avgbn*Ao*dat$po2 *exp(Eo * inv.temp)
+  return(dat)
+}
+
+load_data <- function(spc, constrain_latitude = F) {
+  dat <- readRDS("data/joined_nwfsc_data.rds")
+  dat_by_size <- readRDS("data/sablefish_size_dist.rds")
+  dat = dplyr::filter(dat, species == spc, year%in%seq(2010,2015))
+  dat <- left_join(dat, dat_by_size, by = "trawl_id")
+  # remove tows where there was positive catch but no length measurements
+  dat <- dplyr::filter(dat, !is.na(p1))
+  # analyze sablefish for years and hauls with adequate oxygen and temperature data, within range of occurrence
+  
+  if (constrain_latitude) dat <- dplyr::filter(dat, latitude_dd >=43)
+  
+  # get julian day
+  dat$julian_day <- rep(NA, nrow(dat))
+  for (i in 1:nrow(dat)) dat$julian_day[i] <- as.POSIXlt(dat$date[i], format = "%Y-%b-%d")$yday
+  
+  
+  # create temporary data file, matching J-SCOPE extent, for model fitting
+  if(fit.model) {
+    # constraint to J-SCOPE extent
+    # UTM transformation
+    dat_ll = dat
+    coordinates(dat_ll) <- c("longitude_dd", "latitude_dd")
+    proj4string(dat_ll) <- CRS("+proj=longlat +datum=WGS84")
+    # convert to utm with spTransform
+    dat_utm = spTransform(dat_ll, 
+                          CRS("+proj=utm +zone=10 +datum=WGS84 +units=km"))
+    # convert back from sp object to data frame
+    dat$X <- as.data.frame(dat_utm)$longitude_dd
+    dat$Y <- as.data.frame(dat_utm)$latitude_dd
+    # scale depth and julian dat
+    dat$log_depth_scaled <- scale(log(dat$depth))
+    dat$log_depth_scaled2 <- dat$log_depth_scaled^2
+    dat$jday_scaled <- scale(dat$julian_day)
+    dat$jday_scaled2 <- dat$jday_scaled^2
+    # create temporary data file for fitting
+    fit_dat <- dplyr::filter(dat, !is.na(o2))
+    c_spde <-make_mesh(data = fit_dat, xy_cols = c("X", "Y"), n_knots = 250) # choose # knots
+    # fit dissolved oxygen 
+    o2_model <-  sdmTMB(formula = o2 ~ -1 + log_depth_scaled + log_depth_scaled2 
+                        +  as.factor(year) + jday_scaled + jday_scaled2,
+                        data = fit_dat,
+                        time = "year", spde = c_spde, anisotropy = TRUE,
+                        silent = TRUE, spatial_trend = FALSE, spatial_only = FALSE,
+                        control = sdmTMBcontrol(step.min = 0.01, step.max = 1))
+    # get predictions
+    pred_o2 <- predict(o2_model,
+                       newdata = dat,
+                       return_tmb_object = F)
+    #impute missing values
+    index <- which(is.na(dat$o2))
+    dat$o2[index] <- pred_o2$est[index]
+    
+    # impute salinity, following same steps
+    sal_model <- sdmTMB(formula = o2 ~ -1 + log_depth_scaled + log_depth_scaled2 
+                        +  as.factor(year) + jday_scaled + jday_scaled2,
+                        data = fit_dat,
+                        time = "year", spde = c_spde, anisotropy = TRUE,
+                        silent = TRUE, spatial_trend = FALSE, spatial_only = FALSE,
+                        control = sdmTMBcontrol(step.min = 0.01, step.max = 1)
+    )
+    pred_sal <- predict(sal_model,
+                        newdat = dat,
+                        return_tmb_object = F)
+    index <- which(is.na(dat$sal))
+    dat$sal[index] <- pred_sal$est[index]
+  }
+  
+  # compute metabolic index (mi) --------------------------------------------
+  # converted from Halle Berger matlab script
+  
+  #O2 from trawl data is in ml/l 
+  # just in case, remove any missing or nonsense values from sensors
+  dat <- dplyr::filter(dat, !is.na(o2), !is.na(sal), !is.na(temp), is.finite(sal))
+  dat <- calc_po2_mi(dat)
+  dat <- dplyr::filter(dat, !is.na(temp), !is.na(mi))
+  
+  # prepare data and models -------------------------------------------------
+  
+  dat <- dplyr::select(dat, trawl_id, species, year, longitude_dd, latitude_dd, cpue_kg_km2,
+                       o2, temp, depth, mi, po2, julian_day, pass, p1, p2, p3, p4)
+  
+  
+  # UTM transformation
+  dat_ll = dat
+  coordinates(dat_ll) <- c("longitude_dd", "latitude_dd")
+  proj4string(dat_ll) <- CRS("+proj=longlat +datum=WGS84")
+  # convert to utm with spTransform
+  dat_utm = spTransform(dat_ll, 
+                        CRS("+proj=utm +zone=10 +datum=WGS84 +units=km"))
+  # convert back from sp object to data frame
+  dat = as.data.frame(dat_utm)
+  dat = dplyr::rename(dat, longitude = longitude_dd, 
+                      latitude = latitude_dd)
+  return(dat)
+}
+
+
+# Length Expansion ##
+
+
+
+# Species of interest and max. juvenile lengths (define ontogenetic classes)
+length_expand <- function(sci_name = "Anoplopoma fimbria") {
+# load, clean, and join data
+bio = readRDS("data/wcbts_bio_2019-08-01.rds")
+haul = readRDS("data/wcbts_haul_2019-08-01.rds")
+catch = readRDS("data/wcbts_catch_2019-08-01.rds")
+names(catch) = tolower(names(catch))
+names(bio) = tolower(names(bio))
+names(haul) = tolower(names(haul))
+
+bio$trawl_id = as.character(bio$trawl_id)
+haul$trawl_id = as.character(haul$trawl_id)
+haul$date_yyyymmdd = as.numeric(haul$date_yyyymmdd)
+haul$sampling_end_hhmmss = as.numeric(haul$sampling_end_hhmmss)
+haul$sampling_start_hhmmss = as.numeric(haul$sampling_start_hhmmss)
+
+dat = dplyr::left_join(catch[,c("trawl_id","scientific_name","year","subsample_count",
+                                "subsample_wt_kg","total_catch_numbers","total_catch_wt_kg","cpue_kg_km2")], haul) %>%
+  dplyr::left_join(filter(bio, !is.na(length_cm))) %>%
+  filter(performance == "Satisfactory")  %>%
+  mutate(depth_m = depth_hi_prec_m)
+
+
+
+# filter out species of interest from joined (catch/haul/bio) dataset
+dat_sub = dplyr::filter(dat, scientific_name == sci_name)
+
+# fit length-weight regression by year to predict fish weights that have lengths only.
+# note a rank-deficiency warning may indicate there is insufficient data for some year/sex combinations (likely for unsexed group)
+
+fitted = dat_sub %>%
+  filter(!is.na(length_cm), !is.na(weight_kg)) %>%
+  dplyr::select(trawl_id,year,
+                subsample_wt_kg, total_catch_wt_kg, area_swept_ha_der, cpue_kg_km2,
+                individual_tracking_id, sex, length_cm, weight_kg) %>%
+  group_nest(year)  %>%
+  mutate(
+    model = map(data, ~ lm(log(weight_kg) ~ log(length_cm), data = .x)),
+    tidied = map(model, tidy),
+    augmented = map(model, augment),
+    predictions = map2(data, model, modelr::add_predictions)
+  )
+
+# replace missing weights with predicted weights
+dat_pos = fitted %>%
+  unnest(predictions) %>%
+  dplyr::select(-data, -model, -tidied, -augmented) %>%
+  mutate(weight = ifelse(is.na(weight_kg), exp(pred), weight_kg))
+
+trawlids <- unique(dat_pos$trawl_id)
+p <- data.frame(trawl_id = trawlids,
+                p1 = 0,
+                p2 = 0,
+                p3 = 0,
+                p4 = 0)
+
+sizethresholds <- quantile(dat_pos$weight, c(0.15, 0.5, 0.85, 1), na.rm = T)
+for (i in 1:length(trawlids)) {
+  haul_sample<- dplyr::filter(dat_pos, trawl_id == trawlids[i])
+  if(nrow(haul_sample) > 0 | var(haul_sample$weight >0)) {
+    # fit kernel density to weight frequency
+    smoothed_w <- bkde(haul_sample$weight, range.x = c(min(dat_pos$weight), max(dat_pos$weight)), bandwidth = 2)
+    # make sure smoother predicts positive or zero density
+    smoothed_w$y[smoothed_w$y<0] <- 0
+    # calculate proportion by biomass and by number
+    p_w_byweight <- smoothed_w$y * smoothed_w$x / sum(smoothed_w$x*smoothed_w$y)
+
+    
+    #p_w_byweight[p_w_byweight<0] <- 0
+    #p_w_bynum[p_w_bynum<0] <- 0
+    
+    p1 <- sum(p_w_byweight[smoothed_w$x<=sizethresholds[1]])
+    p2 <- sum(p_w_byweight[smoothed_w$x>0.5 & smoothed_w$x <=sizethresholds[1]])
+    p3 <- sum(p_w_byweight[smoothed_w$x>2 & smoothed_w$x <=sizethresholds[1]])
+    p4 <- sum(p_w_byweight[smoothed_w$x>sizethresholds[3]])
+  
+    
+    
+    p[i,2:5] <- c(p1, p2, p3, p4)
+    
+  }
+  else {
+    indx <- which(sizethresholds>haul_sample$weight)
+    p[i, min(indx)+1] <- 1
+  }
+}
+
+
+# add hauls with zero catch back in
+absent = filter(dat_sub, cpue_kg_km2 == 0)
+trawlids <- unique(absent$trawl_id)
+absent.df <- data.frame(trawl_id = trawlids,
+                        p1 = 0,
+                        p2 = 0,
+                        p3 = 0,
+                        p4 = 0)
+
+all_hauls <- rbind(p, absent.df)
+all_hauls$trawl_id <- as.numeric(all_hauls$trawl_id)
+return(all_hauls)
+}

@@ -18,8 +18,35 @@ library(mgcv)
 library(here)
 
 brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
-logfun <- function(x, s50, delta, smax) smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1)
-
+logfun <- function(x, model, mi = F) {
+  if (mi) {
+    parfit <- model$sd_report
+    npars <- length(parfit$value)
+    parnames <- names(parfit$value)
+    
+    s50 <- parfit$value[grep("s50", parnames)]
+    delta <- parfit$value[grep("s95", parnames)]
+    smax <- parfit$value[grep("s_max", parnames)]
+  }
+  if (!mi) {
+    parfit <- model$sd_report
+    npars <- length(parfit$value)
+    parnames <- names(parfit$value)
+    
+    s50 <- parfit$value[grep("s50", parnames)]
+    s95 <- s50 + exp(parfit$value[grep("s95", parnames)] )
+    delta <- s95 - s50
+    smax <- parfit$value[grep("s_max", parnames)]
+  }
+  return(smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1))
+} 
+getEo <- function(model) {
+  parfit <- model$sd_report
+  npars <- length(parfit$value)
+  parnames <- names(parfit$value)
+  Eo <- parfit$value[grep("Eo", parnames)]
+  return(Eo)
+}
 ### Load Data ####
 #here("thresholds_mi_distribution")
 setwd("/Users/jindiv/Dropbox/GitHub/estimating_mi_from_distribution2")
@@ -99,22 +126,16 @@ AIC(m2)
 ##### extract estimates ####
 
 re2 <- m2$tmb_random
-parfit <- m2$sd_report
-npars <- length(parfit$value)
-parnames <- names(parfit$value)
 
-s50 <- parfit$value[grep("s50", parnames)]
-delta <- parfit$value[grep("s95", parnames)]
-smax <- parfit$value[grep("s_max", parnames)]
-Eo <- parfit$value[grep("Eo", parnames)]
+
 betas <-  m2$sd_report$par.fixed[grep("b_j", names( m2$sd_report$par.fixed))]
 
 beta_depth <- betas[(length(betas)-1):length(betas)]
-
+Eo <- getEo(model = m2)
 ##### plot ####
 po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
-plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
+plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
      xlim = c(0,5),
      main="Eo estimation and logistic pO2'",
      ylab = "po2-prime marginal effect")
@@ -152,23 +173,13 @@ AIC(m2a)
 ##### extract estimates ####
 
 re2a <- m2a$tmb_random
-parfit <- m2a$sd_report
-npars <- length(parfit$value)
-parnames <- names(parfit$value)
-
-s50 <- parfit$value[grep("s50", parnames)]
-delta <- parfit$value[grep("s95", parnames)]
-smax <- parfit$value[grep("s_max", parnames)]
-Eo <- parfit$value[grep("Eo", parnames)]
-betas <-  m2a$sd_report$par.fixed[grep("b_j", names( m2a$sd_report$par.fixed))]
-
-beta_depth <- betas[(length(betas)-1):length(betas)]
+Eo <- getEo(model = m2a)
 
 ##### plot ####
 ## Calculate po2 prime from parameter ##
 po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
-plot(po2_prime, exp(logfun(po2_prime, s50, delta, smax)),
+plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
      xlim = c(0,5),
      main="Eo estimation and logistic pO2 (with prior)'",
      ylab = "po2-prime marginal effect")
@@ -195,17 +206,9 @@ summary(m3)
 
 #### Plot fitted relationship ####
 ##### extract estimates ####
-parfit <- m3$sd_report
-npars <- length(parfit$value)
-parnames <- names(parfit$value)
-
-s50 <- parfit$value[grep("s50", parnames)]
-s95 <- (parfit$value[grep("s95", parnames)] )
-delta <- s95 - s50
-smax <- parfit$value[grep("s_max", parnames)]
 
 ##### plot ####
-plot(dat$po2, exp(logfun(dat$po2_sc, s50, delta, smax)),
+plot(dat$po2, exp(logfun(dat$po2_sc, model = m3, mi = F)),
      main="Logistic-pO2",
      xlim = c(0,5),
      ylab = "po2 marginal effect",
@@ -243,7 +246,7 @@ AIC[5,] <- AIC(m4)
 ## Calculate delta-AIC ##
 AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
 
-### Plot depth effects ###
+### Plot depth effects  ####
 ## Set ggplot theme ##
 theme_set(theme_bw(base_size = 30))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
@@ -256,8 +259,8 @@ pars <- par_estimates[1:2]
 pars <- pivot_wider(pars, names_from=term, values_from=estimate)
 # Calculate temp-corrected po2 from Eo value #
 dat$mi_pred <- dat$po2*exp(pars$"mi-Eo"* dat$invtemp)
-# Calculate effect of MI #
-dat$mi_effect <- pars$"mi-smax" * (1 / (1 + exp(-log(19) * (dat$mi_pred - pars$`mi-s50`) / pars$"mi-delta")) - 1)
+# Calculate effect of MI # Tim note: probably better to use the logfun function above to calculate the log effect size from po2prime or po2.  
+dat$mi_effect <- pars$"mi-smax" * (1 / (1 + exp(-log(19) * (dat$mi_pred - pars$`mi-s50`) / pars$"mi-delta")) - 1). # this is exponentiated. 
 # Calculate combined depth effect #
 dat$depth_effect_combined <- (dat$log_depth_scaled*pars$log_depth_scaled)+(dat$log_depth_scaled2*pars$log_depth_scaled2)
 
