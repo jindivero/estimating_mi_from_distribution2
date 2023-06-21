@@ -11,6 +11,7 @@ library(visreg)
 library(ggeffects)
 library(mgcv)
 library(here)
+library(gsw)
   
   
 # calc o2 solubility, relies on o2 in umol/kg
@@ -144,16 +145,14 @@ calc_po2_mi <- function(dat) {
   return(dat)
 }
 
-load_data <- function(spc, constrain_latitude = F) {
+load_data <- function(spc,dat.by.size) {
   dat <- readRDS("data/joined_nwfsc_data.rds")
-  dat_by_size <- readRDS("data/sablefish_size_dist.rds")
+  
   dat = dplyr::filter(dat, species == spc, year%in%seq(2010,2015))
-  dat <- left_join(dat, dat_by_size, by = "trawl_id")
+  dat <- left_join(dat, dat.by.size, by = "trawl_id")
   # remove tows where there was positive catch but no length measurements
   dat <- dplyr::filter(dat, !is.na(p1))
-  # analyze sablefish for years and hauls with adequate oxygen and temperature data, within range of occurrence
-  
-  if (constrain_latitude) dat <- dplyr::filter(dat, latitude_dd >=43)
+  # analyze or years and hauls with adequate oxygen and temperature data, within range of occurrence
   
   # get julian day
   dat$julian_day <- rep(NA, nrow(dat))
@@ -161,55 +160,6 @@ load_data <- function(spc, constrain_latitude = F) {
   
   
   # create temporary data file, matching J-SCOPE extent, for model fitting
-  if(fit.model) {
-    # constraint to J-SCOPE extent
-    # UTM transformation
-    dat_ll = dat
-    coordinates(dat_ll) <- c("longitude_dd", "latitude_dd")
-    proj4string(dat_ll) <- CRS("+proj=longlat +datum=WGS84")
-    # convert to utm with spTransform
-    dat_utm = spTransform(dat_ll, 
-                          CRS("+proj=utm +zone=10 +datum=WGS84 +units=km"))
-    # convert back from sp object to data frame
-    dat$X <- as.data.frame(dat_utm)$longitude_dd
-    dat$Y <- as.data.frame(dat_utm)$latitude_dd
-    # scale depth and julian dat
-    dat$log_depth_scaled <- scale(log(dat$depth))
-    dat$log_depth_scaled2 <- dat$log_depth_scaled^2
-    dat$jday_scaled <- scale(dat$julian_day)
-    dat$jday_scaled2 <- dat$jday_scaled^2
-    # create temporary data file for fitting
-    fit_dat <- dplyr::filter(dat, !is.na(o2))
-    c_spde <-make_mesh(data = fit_dat, xy_cols = c("X", "Y"), n_knots = 250) # choose # knots
-    # fit dissolved oxygen 
-    o2_model <-  sdmTMB(formula = o2 ~ -1 + log_depth_scaled + log_depth_scaled2 
-                        +  as.factor(year) + jday_scaled + jday_scaled2,
-                        data = fit_dat,
-                        time = "year", spde = c_spde, anisotropy = TRUE,
-                        silent = TRUE, spatial_trend = FALSE, spatial_only = FALSE,
-                        control = sdmTMBcontrol(step.min = 0.01, step.max = 1))
-    # get predictions
-    pred_o2 <- predict(o2_model,
-                       newdata = dat,
-                       return_tmb_object = F)
-    #impute missing values
-    index <- which(is.na(dat$o2))
-    dat$o2[index] <- pred_o2$est[index]
-    
-    # impute salinity, following same steps
-    sal_model <- sdmTMB(formula = o2 ~ -1 + log_depth_scaled + log_depth_scaled2 
-                        +  as.factor(year) + jday_scaled + jday_scaled2,
-                        data = fit_dat,
-                        time = "year", spde = c_spde, anisotropy = TRUE,
-                        silent = TRUE, spatial_trend = FALSE, spatial_only = FALSE,
-                        control = sdmTMBcontrol(step.min = 0.01, step.max = 1)
-    )
-    pred_sal <- predict(sal_model,
-                        newdat = dat,
-                        return_tmb_object = F)
-    index <- which(is.na(dat$sal))
-    dat$sal[index] <- pred_sal$est[index]
-  }
   
   # compute metabolic index (mi) --------------------------------------------
   # converted from Halle Berger matlab script
@@ -241,10 +191,6 @@ load_data <- function(spc, constrain_latitude = F) {
 }
 
 
-# Length Expansion ##
-
-
-
 # Species of interest and max. juvenile lengths (define ontogenetic classes)
 length_expand <- function(sci_name = "Anoplopoma fimbria") {
 # load, clean, and join data
@@ -262,8 +208,8 @@ haul$sampling_end_hhmmss = as.numeric(haul$sampling_end_hhmmss)
 haul$sampling_start_hhmmss = as.numeric(haul$sampling_start_hhmmss)
 
 dat = dplyr::left_join(catch[,c("trawl_id","scientific_name","year","subsample_count",
-                                "subsample_wt_kg","total_catch_numbers","total_catch_wt_kg","cpue_kg_km2")], haul) %>%
-  dplyr::left_join(filter(bio, !is.na(length_cm))) %>%
+                                "subsample_wt_kg","total_catch_numbers","total_catch_wt_kg","cpue_kg_km2")], haul, relationship = "many-to-many") %>%
+  dplyr::left_join(filter(bio, !is.na(length_cm)), relationship = "many-to-many") %>%
   filter(performance == "Satisfactory")  %>%
   mutate(depth_m = depth_hi_prec_m)
 
@@ -313,12 +259,12 @@ for (i in 1:length(trawlids)) {
     p_w_byweight <- smoothed_w$y * smoothed_w$x / sum(smoothed_w$x*smoothed_w$y)
 
     
-    #p_w_byweight[p_w_byweight<0] <- 0
+    p_w_byweight[p_w_byweight<0] <- 0
     #p_w_bynum[p_w_bynum<0] <- 0
     
     p1 <- sum(p_w_byweight[smoothed_w$x<=sizethresholds[1]])
-    p2 <- sum(p_w_byweight[smoothed_w$x>0.5 & smoothed_w$x <=sizethresholds[1]])
-    p3 <- sum(p_w_byweight[smoothed_w$x>2 & smoothed_w$x <=sizethresholds[1]])
+    p2 <- sum(p_w_byweight[smoothed_w$x>sizethresholds[1] & smoothed_w$x <=sizethresholds[2]])
+    p3 <- sum(p_w_byweight[smoothed_w$x>sizethresholds[2] & smoothed_w$x <=sizethresholds[3]])
     p4 <- sum(p_w_byweight[smoothed_w$x>sizethresholds[3]])
   
     
@@ -345,4 +291,34 @@ absent.df <- data.frame(trawl_id = trawlids,
 all_hauls <- rbind(p, absent.df)
 all_hauls$trawl_id <- as.numeric(all_hauls$trawl_id)
 return(all_hauls)
+}
+brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
+logfun <- function(x, model, mi = F) {
+  if (mi) {
+    parfit <- model$sd_report
+    npars <- length(parfit$value)
+    parnames <- names(parfit$value)
+    
+    s50 <- parfit$value[grep("s50", parnames)]
+    delta <- parfit$value[grep("s95", parnames)]
+    smax <- parfit$value[grep("s_max", parnames)]
+  }
+  if (!mi) {
+    parfit <- model$sd_report
+    npars <- length(parfit$value)
+    parnames <- names(parfit$value)
+    
+    s50 <- parfit$value[grep("s50", parnames)]
+    s95 <- s50 + exp(parfit$value[grep("s95", parnames)] )
+    delta <- s95 - s50
+    smax <- parfit$value[grep("s_max", parnames)]
+  }
+  return(smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1))
+} 
+getEo <- function(model) {
+  parfit <- model$sd_report
+  npars <- length(parfit$value)
+  parnames <- names(parfit$value)
+  Eo <- parfit$value[grep("Eo", parnames)]
+  return(Eo)
 }

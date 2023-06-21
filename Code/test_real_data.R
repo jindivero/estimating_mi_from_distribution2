@@ -1,57 +1,33 @@
 ### Install packages ####
-#remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+install_local <- F 
+library(devtools)
+
+if (install_local) devtools::install_local("/Users/jindiv/Dropbox/GitHub/sdmTMB-mi.zip")
+if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+
+### load helper functions ####
+source("Code/util_funs.R")
 
 
-#install.packages("devtools")
-#library(devtools)
-#install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
-#library(INLA)
-devtools::install_local("/Users/jindiv/Dropbox/GitHub/sdmTMB-mi.zip")
-library(sdmTMB)
-
-library(ggplot2)
-library(visreg)
-library(ggeffects)
-library(dplyr)
-library(tidyr)
-library(mgcv)
-library(here)
-
-brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
-logfun <- function(x, model, mi = F) {
-  if (mi) {
-    parfit <- model$sd_report
-    npars <- length(parfit$value)
-    parnames <- names(parfit$value)
-    
-    s50 <- parfit$value[grep("s50", parnames)]
-    delta <- parfit$value[grep("s95", parnames)]
-    smax <- parfit$value[grep("s_max", parnames)]
-  }
-  if (!mi) {
-    parfit <- model$sd_report
-    npars <- length(parfit$value)
-    parnames <- names(parfit$value)
-    
-    s50 <- parfit$value[grep("s50", parnames)]
-    s95 <- s50 + exp(parfit$value[grep("s95", parnames)] )
-    delta <- s95 - s50
-    smax <- parfit$value[grep("s_max", parnames)]
-  }
-  return(smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1))
-} 
-getEo <- function(model) {
-  parfit <- model$sd_report
-  npars <- length(parfit$value)
-  parnames <- names(parfit$value)
-  Eo <- parfit$value[grep("Eo", parnames)]
-  return(Eo)
-}
 ### Load Data ####
-#here("thresholds_mi_distribution")
-setwd("/Users/jindiv/Dropbox/GitHub/estimating_mi_from_distribution2")
-dat <- readRDS("data_sablefish2.rds")
+sci_name <- "Eopsetta jordani"
+spc <- "petrale sole"
+dat.by.size <- length_expand(sci_name)
+dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
+dat$temp_s <- (scale(dat$temp))
+dat$po2_s <- (scale(dat$po2))
+dat$log_depth_scaled <- scale(log(dat$depth))
+dat$log_depth_scaled2 <- with(dat, log_depth_scaled ^ 2)
+dat$jday_scaled <- scale(dat$julian_day)
+dat$jday_scaled2 <- with(dat, jday_scaled ^ 2)
+dat$X <- dat$longitude
+dat$Y <- dat$latitude
+dat$cpue_kg_km2 <- dat$cpue_kg_km2 * (dat$p2+dat$p3)
+
+# Remove outliers = catch > 10 sd above the mean
+dat$cpue_s <- scale(dat$cpue_kg_km2)
+dat <- dplyr::filter(dat, cpue_s <=20)
 ### Calculate inverse temp ####
 kelvin = 273.15 #To convert to Kelvin
 boltz = 0.000086173324 #Boltzman's constant
@@ -63,10 +39,10 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 
 ### Fit Breakpoint model to po2 ####
 start <- matrix(0, nrow = 2, ncol = 1)
-start[1,1] <- 20
-start[2,1] <- -1.1
+start[1,1] <- 0
+start[2,1] <- 0
 
-m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_sc)+log_depth_scaled+log_depth_scaled2, 
+m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
              time = NULL,
              reml = F,
@@ -88,24 +64,20 @@ m1_pars <- m1$sd_report$par.fixed
 m1_parnames <- names(m1_pars)
 b_threshold <- m1_pars[grep("b_threshold", m1_parnames)]
 ##### plot ####
-plot(dat$po2, exp(sapply(X = dat$po2_sc, FUN = brkptfun, b_slope = b_threshold[1], b_thresh = b_threshold[2])),
+plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1], b_thresh = b_threshold[2])),
      ylab = "po2 marginal effect", 
      main="Breakpoint-pO2",
      xlab="pO2",
      xlim = c(0,5),)
 
-## Identify number below threshold ##
-dat$po2_prime <- po2_prime
-dat_below2 <- subset(dat, po2 < exp(-1.09))
-
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
 
 start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- 2 #s50
-start[2, 1] <- (1) #delta
-start[3, 1] <- 10 #smax (ie beta_3)
-start[4, 1] <- 0.68 #Eo
+start[1, 1] <- 3 #s50
+start[2, 1] <- 1 #delta
+start[3, 1] <- 1 #smax (ie beta_3)
+start[4, 1] <- 0.3 #Eo
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
@@ -116,7 +88,7 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = c(-Inf, -Inf, 0, 0)), upper = list(b_threshold = c(Inf, Inf,50, Inf)),
+               lower = list(b_threshold = c(-2, 0.01, 0.01, 0.01)), upper = list(b_threshold = c(20, 20,50, 3)),
                newton_loops = 1))
 
 summary(m2)
@@ -125,12 +97,6 @@ AIC(m2)
 #### Plot fitted relationshop ####
 ##### extract estimates ####
 
-re2 <- m2$tmb_random
-
-
-betas <-  m2$sd_report$par.fixed[grep("b_j", names( m2$sd_report$par.fixed))]
-
-beta_depth <- betas[(length(betas)-1):length(betas)]
 Eo <- getEo(model = m2)
 ##### plot ####
 po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
@@ -140,18 +106,15 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
      main="Eo estimation and logistic pO2'",
      ylab = "po2-prime marginal effect")
 
-## Identify number below threshold ##
-dat$po2_prime <- po2_prime
-dat_below <- subset(dat, po2_prime<1)
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
 #Set starting parameters: 
 
 start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- 2 #s50
-start[2, 1] <- (1) #delta
-start[3, 1] <- 10 #smax (ie beta_3)
-start[4, 1] <- 0.68 #Eo
+start[1, 1] <- 3 #s50
+start[2, 1] <- 1 #delta
+start[3, 1] <- 5 #smax (ie beta_3)
+start[4, 1] <- 0.48 #Eo
 m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
@@ -163,7 +126,7 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = c(-Inf, -Inf, 0, 0)), upper = list(b_threshold = c(Inf, Inf,50, Inf)),
+               lower = list(b_threshold = c(-Inf, -Inf, 0.01, 0.01)), upper = list(b_threshold = c(Inf, Inf,50, Inf)),
                newton_loops = 1))
 
 summary(m2a)
@@ -172,7 +135,6 @@ AIC(m2a)
 #### Plot fitted relationshop ####
 ##### extract estimates ####
 
-re2a <- m2a$tmb_random
 Eo <- getEo(model = m2a)
 
 ##### plot ####
@@ -188,8 +150,8 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
 start <- matrix(0, ncol = 1, nrow = 3)
 start[1, 1] <- -1.5 #s50
 start[2, 1] <- log(0.5) # log delta
-start[3, 1] <- 40 #smax
-m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_sc)+log_depth_scaled+log_depth_scaled2, 
+start[3, 1] <- 20 #smax
+m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -199,7 +161,7 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_sc)+log_depth_scaled+log_depth_s
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
-               newton_loops = 2
+               lower = list(b_threshold = c(-4, -Inf, 0.01)), upper = list(b_threshold = c(4, 3,200)),
              ))
 summary(m3)
 
@@ -208,7 +170,7 @@ summary(m3)
 ##### extract estimates ####
 
 ##### plot ####
-plot(dat$po2, exp(logfun(dat$po2_sc, model = m3, mi = F)),
+plot(dat$po2, exp(logfun(dat$po2_s, model = m3, mi = F)),
      main="Logistic-pO2",
      xlim = c(0,5),
      ylab = "po2 marginal effect",
