@@ -1,9 +1,10 @@
 ### Install packages ####
-install_local <- F 
+install_local <- F
 library(devtools)
 
 if (install_local) devtools::install_local("/Users/jindiv/Dropbox/GitHub/sdmTMB-mi.zip")
 if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+library(sdmTMB)
 
 ### load helper functions ####
 source("Code/util_funs.R")
@@ -24,6 +25,7 @@ dat$jday_scaled2 <- with(dat, jday_scaled ^ 2)
 dat$X <- dat$longitude
 dat$Y <- dat$latitude
 dat$cpue_kg_km2 <- dat$cpue_kg_km2 * (dat$p2+dat$p3)
+dat$year <- as.factor(dat$year)
 
 # Remove outliers = catch > 10 sd above the mean
 dat$cpue_s <- scale(dat$cpue_kg_km2)
@@ -37,10 +39,14 @@ dat$invtemp <- (1 / boltz)  * ( 1 / (dat$temp + 273.15) - 1 / (tref + 273.15)) #
 ### Make mesh ####
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 
+## Get initial values ##
+init_vals <- get_inits()
+
 ### Fit Breakpoint model to po2 ####
+
 start <- matrix(0, nrow = 2, ncol = 1)
 start[1,1] <- 0
-start[2,1] <- 0
+start[2,1] <- -0.2
 
 m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
@@ -52,7 +58,9 @@ m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_sca
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               newton_loops = 1))
+               lower = list(b_threshold = c(0, -Inf)), 
+               upper = list(b_threshold = c(Inf, Inf)),
+               newton_loops = 2))
 
 summary(m1)
 AIC(m1)
@@ -73,10 +81,11 @@ plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1]
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
 
+
 start <- matrix(0, ncol = 1, nrow = 4)
 start[1, 1] <- 3 #s50
 start[2, 1] <- 1 #delta
-start[3, 1] <- 1 #smax (ie beta_3)
+start[3, 1] <- 1#smax (ie beta_3)
 start[4, 1] <- 0.3 #Eo
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
@@ -89,7 +98,8 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
                lower = list(b_threshold = c(-2, 0.01, 0.01, 0.01)), upper = list(b_threshold = c(20, 20,50, 3)),
-               newton_loops = 1))
+               newton_loops = 2,
+               nlminb_loops=2))
 
 summary(m2)
 AIC(m2)
@@ -132,7 +142,7 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
 summary(m2a)
 AIC(m2a)
 
-#### Plot fitted relationshop ####
+#### Plot fitted relationship ####
 ##### extract estimates ####
 
 Eo <- getEo(model = m2a)
@@ -186,7 +196,9 @@ m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2,
              reml=F,
              time=NULL,
              family =tweedie(link="log"),
-             control = sdmTMBcontrol(newton_loops = 2,
+             control = sdmTMBcontrol(
+               
+               newton_loops = 2,
                eval.max = 1000000L,
                iter.max = 1000000L,
                nlminb_loops = 100L
@@ -195,16 +207,98 @@ m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2,
 summary(m4)
 AIC(m4)
 
+### Fit other alternative models ###
+## Temperature ##
+
+m5 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
+             data = dat, 
+             spatial = "on",
+             mesh=mesh,
+             anisotropy=T,
+             reml=F,
+             time=NULL,
+             family =tweedie(link="log"),
+             control = sdmTMBcontrol(
+               newton_loops = 2,
+             )
+)
+
+summary(m5)
+AIC(m5)
+
+##Oxygen only##
+m6 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
+             data = dat, 
+             spatial = "on",
+             mesh=mesh,
+             anisotropy=T,
+             reml=F,
+             time=NULL,
+             family =tweedie(link="log"),
+             control = sdmTMBcontrol(newton_loops = 2,
+                                     eval.max = 1000000L,
+                                     iter.max = 1000000L,
+                                     nlminb_loops = 100L
+             )
+)
+
+summary(m6)
+AIC(m6)
+
+## Temp and o2 ##
+m7 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
+             data = dat, 
+             spatial = "on",
+             mesh=mesh,
+             anisotropy=T,
+             reml=F,
+             time=NULL,
+             family =tweedie(link="log"),
+             control = sdmTMBcontrol(newton_loops = 2,
+                                     eval.max = 1000000L,
+                                     iter.max = 1000000L,
+                                     nlminb_loops = 100L
+             )
+)
+
+summary(m7)
+AIC(m7)
+
+##Temp and o2 interaction ##
+m8 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
+             data = dat, 
+             spatial = "on",
+             mesh=mesh,
+             anisotropy=T,
+             reml=F,
+             time=NULL,
+             family =tweedie(link="log"),
+             control = sdmTMBcontrol(newton_loops = 2,
+                                     eval.max = 1000000L,
+                                     iter.max = 1000000L,
+                                     nlminb_loops = 100L
+             )
+)
+
+summary(m8)
+AIC(m8)
+
+
 ### Create dAIC table ###
 ## Make list of model names##
-models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null")
+models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
 ## Create table and add AIC for each ##
-AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =5, dimnames = list(models)))
+AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =length(models), dimnames = list(models)))
 AIC[1,] <- AIC(m1)
 AIC[2,] <- AIC(m2)
 AIC[3,] <- AIC(m2a)
 AIC[4,] <- AIC(m3)
 AIC[5,] <- AIC(m4)
+AIC[6,] <- AIC(m5)
+AIC[7,] <- AIC(m6)
+AIC[8,] <- AIC(m7)
+AIC[9,] <- AIC(m8)
+
 ## Calculate delta-AIC ##
 AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
 
