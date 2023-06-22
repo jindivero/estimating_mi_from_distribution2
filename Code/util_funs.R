@@ -322,3 +322,91 @@ getEo <- function(model) {
   Eo <- parfit$value[grep("Eo", parnames)]
   return(Eo)
 }
+
+get_inits <- function() {
+  # This function stores initial values and lower / upper bounds for breakpoint / logistic models.
+  init_vals <- list(species <- c("sablefish", "petralesole"))
+  modelnames <- c("m1", "m2", "m2a", "m3")
+  init_vals$sablefish <- list(model = modelnames)
+  init_vals$petrale <- list(model = modelnames)
+  
+  ### Specify sablefish starting values and lower / upper limits #####
+  start <- matrix(0, nrow = 2, ncol = 1)
+  start[1,1] <- 20
+  start[2,1] <- -1.1
+  init_vals$sablefish$m1 <- start
+  init_vals$sablefish$m1$lower <- NULL
+  init_vals$sablefish$m1$upper <- NULL
+  
+  start <- matrix(0, ncol = 1, nrow = 4)
+  start[1, 1] <- 2 #s50
+  start[2, 1] <- (1) #delta
+  start[3, 1] <- 10 #smax 
+  start[4, 1] <- 0.68 #Eo
+  init_vals$sablefish$m2$start <- start
+  init_vals$sablefish$m2$lower <- c(-Inf, -Inf, 0, 0)
+  init_vals$sablefish$m2$upper <- c(Inf, Inf,50, Inf)
+  
+  
+  start <- matrix(0, ncol = 1, nrow = 4)
+  start[1, 1] <- 2 #s50
+  start[2, 1] <- (1) #delta
+  start[3, 1] <- 10 #smax 
+  start[4, 1] <- 0.68 #Eo
+  init_vals$sablefish$m2a$start <- start
+  init_vals$sablefish$m2a$lower <- c(-Inf, -Inf, 0, 0)
+  init_vals$sablefish$m2a$upper <- c(Inf, Inf,50, Inf)
+  
+  start <- matrix(0, ncol = 1, nrow = 3)
+  start[1, 1] <- -1.5 #s50
+  start[2, 1] <- log(0.5) # log delta
+  start[3, 1] <- 40 #smax
+  init_vals$sablefish$m3$start <- start
+  init_vals$sablefish$m3$lower <- NULL
+  init_vals$sablefish$m3$upper <- NULL
+
+  
+  ### Specify petrale sole starting values and lower / upper limits #####
+  start <- matrix(0, nrow = 2, ncol = 1)
+  start[1,1] <- 0
+  start[2,1] <- 0
+  
+  init_vals$petralesole$m1$start <- start
+  init_vals$petralesole$m1$lower <- NULL
+  init_vals$petralesole$m1$upper <- NULL
+  
+  start <- matrix(0, nrow = 4, ncol = 1)
+  start[1, 1] <- 3 #s50
+  start[2, 1] <- 1 #delta
+  start[3, 1] <- 1 #smax 
+  start[4, 1] <- 0.3 #Eo
+  
+  init_vals$petralesole$m2$start <- start
+  init_vals$petralesole$m2$lower <- c(-2, 0.01, 0.01, 0.01)
+  init_vals$petralesole$m2$upper <- c(20, 20,50, 3)
+  
+  start <- matrix(0, ncol = 1, nrow = 4)
+  start[1, 1] <- 3 #s50
+  start[2, 1] <- 1 #delta
+  start[3, 1] <- 5 #smax 
+  start[4, 1] <- 0.48 #Eo
+  
+  init_vals$petralesole$m2a$start <- start
+  init_vals$petralesole$m2a$lower <-  c(-Inf, -Inf, 0.01, 0.01)
+  init_vals$petralesole$m2a$upper <- c(Inf, Inf,50, Inf)
+  
+  start <- matrix(0, ncol = 1, nrow = 3)
+  start[1, 1] <- -1.5 #s50
+  start[2, 1] <- log(0.5) # log delta
+  start[3, 1] <- 20 #smax
+  
+  init_vals$petralesole$m3$start <- start
+  init_vals$petralesole$m3$lower <-   c(-4, -Inf, 0.01)
+  init_vals$petralesole$m3$upper <- c(4, 3,200)
+  
+  
+  
+}
+  
+
+
