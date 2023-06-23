@@ -336,9 +336,9 @@ get_inits <- function() {
   start <- matrix(0, nrow = 2, ncol = 1)
   start[1,1] <- 20
   start[2,1] <- -1.1
-  init_vals$sablefish$m1 <- start
-  init_vals$sablefish$m1$lower <- NULL
-  init_vals$sablefish$m1$upper <- NULL
+  init_vals$sablefish$m1$start <- start
+  init_vals$sablefish$m1$lower <- matrix(data=-Inf, ncol=1, nrow=2)
+  init_vals$sablefish$m1$upper <- matrix(data=Inf, ncol=1, nrow=2)
   
   start <- matrix(0, ncol = 1, nrow = 4)
   start[1, 1] <- 2 #s50
@@ -365,8 +365,8 @@ get_inits <- function() {
   start[2, 1] <- log(0.5) # log delta
   start[3, 1] <- 40 #smax
   init_vals$sablefish$m3$start <- start
-  init_vals$sablefish$m3$lower <- NULL
-  init_vals$sablefish$m3$upper <- NULL
+  init_vals$sablefish$m3$lower <- matrix(data=-Inf, ncol=1, nrow=3)
+  init_vals$sablefish$m3$upper <- matrix(data=Inf, ncol=1, nrow=3)
 
   
   ### Specify petrale sole starting values and lower / upper limits #####
@@ -375,8 +375,8 @@ get_inits <- function() {
   start[2,1] <- 0
   
   init_vals$petralesole$m1$start <- start
-  init_vals$petralesole$m1$lower <- NULL
-  init_vals$petralesole$m1$upper <- NULL
+  init_vals$petralesole$m1$lower <- matrix(data=-Inf, ncol=1, nrow=2)
+  init_vals$petralesole$m1$upper <- matrix(data=Inf, ncol=1, nrow=2)
   
   start <- matrix(0, nrow = 4, ncol = 1)
   start[1, 1] <- 3 #s50

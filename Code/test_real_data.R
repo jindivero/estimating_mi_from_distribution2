@@ -9,13 +9,13 @@ library(sdmTMB)
 ### load helper functions ####
 source("Code/util_funs.R")
 
-
 ### Load Data ####
 sci_name <- "Eopsetta jordani"
 spc <- "petrale sole"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
+## Scale, rename, and calculate variables ##
 dat$temp_s <- (scale(dat$temp))
 dat$po2_s <- (scale(dat$po2))
 dat$log_depth_scaled <- scale(log(dat$depth))
@@ -41,12 +41,29 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 
 ## Get initial values ##
 init_vals <- get_inits()
+## Use initial values or change manually?
+use_previous <- F
 
 ### Fit Breakpoint model to po2 ####
 
-start <- matrix(0, nrow = 2, ncol = 1)
-start[1,1] <- 0
-start[2,1] <- -0.2
+if(use_previous) {
+  if(spc=="petrale sole"){
+  start <- init_vals$petralesole$m1$start
+  upper <- matrix(init_vals$petralesole$m1$upper)
+  lower <- matrix(init_vals$petralesole$m1$lower)
+  }
+  if(spc=="sablefish"){
+    start <- init_vals$sablefish$m1$start
+    upper <- init_vals$sablefish$m1$upper
+    lower <- init_vals$sablefish$m1$lower
+  }
+}
+
+if(!use_previous) {
+  start <- matrix(0, -0.2)
+  lower <- matrix(c(0, -Inf))
+  upper <- matrix(c(Inf, Inf))
+}
 
 m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
@@ -58,8 +75,8 @@ m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_sca
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = c(0, -Inf)), 
-               upper = list(b_threshold = c(Inf, Inf)),
+               lower = list(b_threshold = lower), 
+               upper = list(b_threshold = upper),
                newton_loops = 2))
 
 summary(m1)
@@ -80,13 +97,27 @@ plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1]
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
+#Use previously saved values
+if(use_previous) {
+  if(spc=="petrale sole"){
+  start <- matrix(init_vals$petralesole$m2$start)
+  upper <- matrix(init_vals$petralesole$m2$upper)
+  lower <- matrix(init_vals$petralesole$m2$lower)
+  }
+  if(spc=="sablefish"){
+    start <- init_vals$sablefish$m2$start
+    upper <- init_vals$sablefish$m2$upper
+    lower <- init_vals$sablefish$m2$lower
+  }
+}
 
+#Or change manually
+if(!use_previous) {
+  start <- matrix(c(3,1,1,0.2)) #s50, delta, smax,  Eo
+  lower <- matrix(c(-2, 0.01, 0.01, 0.01))
+  upper <- matrix(c(20, 20,40, 1.5))
+}
 
-start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- 3 #s50
-start[2, 1] <- 1 #delta
-start[3, 1] <- 1#smax (ie beta_3)
-start[4, 1] <- 0.3 #Eo
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
@@ -97,7 +128,7 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = c(-2, 0.01, 0.01, 0.01)), upper = list(b_threshold = c(20, 20,50, 3)),
+               lower = list(b_threshold = lower), upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
 
@@ -119,12 +150,28 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
 #Set starting parameters: 
+if(use_previous) {
+  if(spc=="petrale sole"){
+  start <- init_vals$petralesole$m2a$start
+  upper <- init_vals$petralesole$m2a$upper
+  lower <- init_vals$petralesole$m2a$lower
+  prior <- init_vals$petralesole$m2a$prior
+  }
+  if(spc=="sablefish"){
+    start <- init_vals$sablefish$m2a$start
+    upper <- init_vals$sablefish$m2a$upper
+    lower <- init_vals$sablefish$m2a$lower
+    prior <- init_vals$sablefish$m2a$prior
+  }
+}
 
-start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- 3 #s50
-start[2, 1] <- 1 #delta
-start[3, 1] <- 5 #smax (ie beta_3)
-start[4, 1] <- 0.48 #Eo
+if(!use_previous) {
+  start <- matrix(c(-1,0,2,0.01)) #s50, delta, smax,  Eo
+  lower <- matrix(c(-2, 0.01, 0.01, 0.1))
+  upper <- matrix(c(20, 20,100, 3))
+  prior <- matrix(normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.3)))
+}
+
 m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
@@ -136,8 +183,8 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = c(-Inf, -Inf, 0.01, 0.01)), upper = list(b_threshold = c(Inf, Inf,50, Inf)),
-               newton_loops = 1))
+               lower = list(b_threshold = lower), upper = list(b_threshold = lower),
+               newton_loops = 2))
 
 summary(m2a)
 AIC(m2a)
@@ -157,10 +204,25 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
      ylab = "po2-prime marginal effect")
 
 ### Fit logistic po2 model ####
-start <- matrix(0, ncol = 1, nrow = 3)
-start[1, 1] <- -1.5 #s50
-start[2, 1] <- log(0.5) # log delta
-start[3, 1] <- 20 #smax
+if(use_previous) {
+  if(spc=="petrale sole"){
+  start <- init_vals$petralesole$m3$start
+  upper <- init_vals$petralesole$m3$upper
+  lower <- init_vals$petralesole$m3$lower
+  }
+  if(spc=="sablefish"){
+    start <- init_vals$sablefish$m3$start
+    upper <- init_vals$sablefish$m3$upper
+    lower <- init_vals$sablefish$m3$lower
+  }
+}
+
+if(!use_previous) {
+  start <- matrix(c(-1.5,log(0.5),20)) #s50, delta, smax,  Eo
+  lower <- matrix(c(-4, -Inf, 0.01))
+  upper <- matrix(c(Inf, Inf,50, Inf))
+}
+
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
@@ -171,8 +233,7 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
-               lower = list(b_threshold = c(-4, -Inf, 0.01)), upper = list(b_threshold = c(4, 3,200)),
-             ))
+               lower = list(b_threshold = lower, upper = list(b_threshold = upper))))
 summary(m3)
 
 
@@ -197,7 +258,6 @@ m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2,
              time=NULL,
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
-               
                newton_loops = 2,
                eval.max = 1000000L,
                iter.max = 1000000L,
