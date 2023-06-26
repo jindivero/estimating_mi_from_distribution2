@@ -10,8 +10,9 @@ library(sdmTMB)
 source("Code/util_funs.R")
 
 ### Load Data ####
-sci_name <- "Eopsetta jordani" #"Anoplopoma fimbria"  
-spc <- "petrale sole" #"sablefish"
+
+sci_name <- "Anoplopoma fimbria"
+spc <- "sablefish"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
@@ -60,6 +61,7 @@ if(use_previous) {
 }
 
 if(!use_previous) {
+  start <- matrix(0, 2)
   start <- matrix(c(0, -0.2))
   lower <- matrix(c(0, -Inf))
   upper <- matrix(c(Inf, Inf))
@@ -75,8 +77,6 @@ m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_sca
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = lower), 
-               upper = list(b_threshold = upper),
                newton_loops = 2))
 
 summary(m1)
@@ -117,6 +117,15 @@ if(!use_previous) {
   lower <- matrix(c(-2, 0.01, 0.01, 0.01))
   upper <- matrix(c(20, 20,40, 1.5))
 }
+
+start <- matrix(0, ncol = 1, nrow = 4)
+start[1, 1] <- 0 #s50
+start[2, 1] <- 2 #delta
+start[3, 1] <- 20 #smax 
+start[4, 1] <- 1.00 #Eo
+lower <- c(-Inf, .001, 0, 0)
+upper <- c(Inf, Inf, Inf, Inf)
+
 
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
@@ -172,6 +181,12 @@ if(!use_previous) {
   prior <- matrix(normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.3)))
 }
 
+start[1, 1] <- -1 #s50
+start[2, 1] <- 0.65 #delta
+start[3, 1] <- 200 #smax 
+start[4, 1] <- 0.68 #Eo
+
+prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
 m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
@@ -180,10 +195,9 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              spatiotemporal = FALSE,
              mesh=mesh,
              family =tweedie(link="log"),
-             priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))),
+             priors=sdmTMBpriors(threshold = prior),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = lower), upper = list(b_threshold = lower),
                newton_loops = 2))
 
 summary(m2a)
@@ -223,6 +237,14 @@ if(!use_previous) {
   upper <- matrix(c(Inf, Inf,50, Inf))
 }
 
+
+start <- matrix(0, ncol = 1, nrow = 3)
+start[1, 1] <- -1.5 #s50
+start[2, 1] <- log(0.5) # log delta
+start[3, 1] <- 40 #smax
+
+lower <- matrix(data=-Inf, ncol=1, nrow=3)
+upper <- matrix(data=Inf, ncol=1, nrow=3)
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
@@ -232,8 +254,10 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              time=NULL,
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
-               start = list(b_threshold=start),
-               lower = list(b_threshold = lower, upper = list(b_threshold = upper))))
+               start = list(b_threshold=start)
+               #lower = list(b_threshold = lower, upper = list(b_threshold = upper)))
+               )
+)
 summary(m3)
 
 

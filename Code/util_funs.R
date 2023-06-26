@@ -149,7 +149,6 @@ calc_po2_mi <- function(dat) {
 
 load_data <- function(spc,dat.by.size) {
   dat <- readRDS("data/joined_nwfsc_data.rds")
-  
   dat = dplyr::filter(dat, species == spc, year%in%seq(2010,2015))
   dat <- left_join(dat, dat.by.size, by = "trawl_id")
   # remove tows where there was positive catch but no length measurements
@@ -160,11 +159,6 @@ load_data <- function(spc,dat.by.size) {
   dat$julian_day <- rep(NA, nrow(dat))
   for (i in 1:nrow(dat)) dat$julian_day[i] <- as.POSIXlt(dat$date[i], format = "%Y-%b-%d")$yday
   
-  
-  # create temporary data file, matching J-SCOPE extent, for model fitting
-  
-  # compute metabolic index (mi) --------------------------------------------
-  # converted from Halle Berger matlab script
   
   #O2 from trawl data is in ml/l 
   # just in case, remove any missing or nonsense values from sensors
@@ -187,7 +181,7 @@ load_data <- function(spc,dat.by.size) {
                         CRS("+proj=utm +zone=10 +datum=WGS84 +units=km"))
   # convert back from sp object to data frame
   dat = as.data.frame(dat_utm)
-  dat = dplyr::rename(dat, longitude = coords.x1, 
+  dat = dplyr::rename(dat, longitude = coords.x1,
                       latitude = coords.x2)
   return(dat)
 }
@@ -343,12 +337,12 @@ get_inits <- function() {
   
   start <- matrix(0, ncol = 1, nrow = 4)
   start[1, 1] <- 2 #s50
-  start[2, 1] <- (1) #delta
-  start[3, 1] <- 10 #smax 
-  start[4, 1] <- 0.68 #Eo
+  start[2, 1] <- 1 #delta
+  start[3, 1] <- 20 #smax 
+  start[4, 1] <- 1.00 #Eo
   init_vals$sablefish$m2$start <- start
-  init_vals$sablefish$m2$lower <- c(-Inf, -Inf, 0, 0)
-  init_vals$sablefish$m2$upper <- c(Inf, Inf,50, Inf)
+  init_vals$sablefish$m2$lower <- c(-Inf, .001, 0, 0)
+  init_vals$sablefish$m2$upper <- c(Inf, Inf,Inf, Inf)
   
   
   start <- matrix(0, ncol = 1, nrow = 4)
@@ -357,7 +351,7 @@ get_inits <- function() {
   start[3, 1] <- 10 #smax 
   start[4, 1] <- 0.68 #Eo
   init_vals$sablefish$m2a$start <- start
-  init_vals$sablefish$m2a$lower <- c(-Inf, -Inf, 0, 0)
+  init_vals$sablefish$m2a$lower <- c(-Inf, 0.01, 0, 0)
   init_vals$sablefish$m2a$upper <- c(Inf, Inf,50, Inf)
   init_vals$sablefish$m2a$prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
   
