@@ -288,6 +288,7 @@ all_hauls <- rbind(p, absent.df)
 all_hauls$trawl_id <- as.numeric(all_hauls$trawl_id)
 return(all_hauls)
 }
+
 brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
 logfun <- function(x, model, mi = F) {
   if (mi) {
