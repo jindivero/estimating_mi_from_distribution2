@@ -194,7 +194,7 @@ load_data <- function(spc,dat.by.size) {
 
 
 # Species of interest and max. juvenile lengths (define ontogenetic classes)
-length_expand <- function(sci_name = "Anoplopoma fimbria") {
+length_expand <- function(sci_name) {
 # load, clean, and join data
 bio = readRDS("data/wcbts_bio_2019-08-01.rds")
 haul = readRDS("data/wcbts_haul_2019-08-01.rds")
@@ -294,6 +294,7 @@ all_hauls <- rbind(p, absent.df)
 all_hauls$trawl_id <- as.numeric(all_hauls$trawl_id)
 return(all_hauls)
 }
+
 brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
 logfun <- function(x, model, mi = F) {
   if (mi) {

@@ -1,8 +1,8 @@
 ### Install packages ####
-install_local <- F
+install_local <- T
 library(devtools)
 
-if (install_local) devtools::install_local("/Users/jindiv/Dropbox/GitHub/sdmTMB-mi.zip")
+if (install_local) devtools::install_local("/Users/juliaindivero/Library/CloudStorage/Dropbox/sdmTMB-mi.zip")
 if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
 library(sdmTMB)
 
@@ -10,8 +10,8 @@ library(sdmTMB)
 source("Code/util_funs.R")
 
 ### Load Data ####
-sci_name <- "Eopsetta jordani"
-spc <- "petrale sole"
+sci_name <- "Eopsetta jordani" #"Anoplopoma fimbria"  
+spc <- "petrale sole" #"sablefish"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
@@ -34,7 +34,7 @@ dat <- dplyr::filter(dat, cpue_s <=20)
 kelvin = 273.15 #To convert to Kelvin
 boltz = 0.000086173324 #Boltzman's constant
 tref <- 7 #Reference temperature in celsius
-dat$invtemp <- (1 / boltz)  * ( 1 / (dat$temp + 273.15) - 1 / (tref + 273.15)) #invtemp #I used z because "psi" was too confusing
+dat$invtemp <- (1 / boltz)  * ( 1 / (dat$temp + 273.15) - 1 / (tref + 273.15)) #invtemp 
 
 ### Make mesh ####
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
@@ -60,7 +60,7 @@ if(use_previous) {
 }
 
 if(!use_previous) {
-  start <- matrix(0, -0.2)
+  start <- matrix(c(0, -0.2))
   lower <- matrix(c(0, -Inf))
   upper <- matrix(c(Inf, Inf))
 }
