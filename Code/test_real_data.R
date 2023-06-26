@@ -235,6 +235,14 @@ if(!use_previous) {
   upper <- matrix(c(Inf, Inf,50, Inf))
 }
 
+
+start <- matrix(0, ncol = 1, nrow = 3)
+start[1, 1] <- -1.5 #s50
+start[2, 1] <- log(0.5) # log delta
+start[3, 1] <- 40 #smax
+
+lower <- matrix(data=-Inf, ncol=1, nrow=3)
+upper <- matrix(data=Inf, ncol=1, nrow=3)
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
@@ -244,8 +252,10 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              time=NULL,
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
-               start = list(b_threshold=start),
-               lower = list(b_threshold = lower, upper = list(b_threshold = upper))))
+               start = list(b_threshold=start)
+               #lower = list(b_threshold = lower, upper = list(b_threshold = upper)))
+               )
+)
 summary(m3)
 
 
