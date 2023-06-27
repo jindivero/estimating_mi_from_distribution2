@@ -11,10 +11,15 @@ source("Code/util_funs.R")
 
 ### Load Data ####
 
+
 sci_name <- "Eopsetta jordani"#"Anoplopoma fimbria"
 spc <- "petrale sole"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
+
+#Constrain depth for petrale
+constrain_depth <- F
+if(constrain_depth) dat <- subset(dat, depth<500)
 
 ## Scale, rename, and calculate variables ##
 dat$temp_s <- (scale(dat$temp))
@@ -42,30 +47,11 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 
 ## Get initial values ##
 init_vals <- get_inits()
-## Use initial values or change manually?
-use_previous <- F
 
 ### Fit Breakpoint model to po2 ####
-
-if(use_previous) {
-  if(spc=="petrale sole"){
-  start <- init_vals$petralesole$m1$start
-  upper <- matrix(init_vals$petralesole$m1$upper)
-  lower <- matrix(init_vals$petralesole$m1$lower)
-  }
-  if(spc=="sablefish"){
-    start <- init_vals$sablefish$m1$start
-    upper <- init_vals$sablefish$m1$upper
-    lower <- init_vals$sablefish$m1$lower
-  }
-}
-
-if(!use_previous) {
-  start <- matrix(0, 2)
-  start <- matrix(c(0, -0.2))
-  lower <- matrix(c(0, -Inf))
-  upper <- matrix(c(Inf, Inf))
-}
+#start <- init_vals$petralesole$m1$start
+if(constrain_depth) start <- matrix(c(0,-1))
+if(!constrain_depth)start <- matrix(c(200,-1))
 
 start <- matrix(0,2)
 start[2,1] <- - 0.4
@@ -100,6 +86,7 @@ plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1]
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
+
 #Use previously saved values
 if(use_previous) {
   if(spc=="petrale sole"){
@@ -140,7 +127,7 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = lower), 
+               lower = list(b_threshold = lower),
                upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
@@ -152,6 +139,7 @@ AIC(m2)
 ##### extract estimates ####
 
 Eo <- getEo(model = m2)
+
 ##### plot ####
 po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
@@ -162,21 +150,12 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
 
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
-#Set starting parameters: 
-if(use_previous) {
-  if(spc=="petrale sole"){
-  start <- init_vals$petralesole$m2a$start
-  upper <- init_vals$petralesole$m2a$upper
-  lower <- init_vals$petralesole$m2a$lower
-  prior <- init_vals$petralesole$m2a$prior
-  }
-  if(spc=="sablefish"){
-    start <- init_vals$sablefish$m2a$start
-    upper <- init_vals$sablefish$m2a$upper
-    lower <- init_vals$sablefish$m2a$lower
-    prior <- init_vals$sablefish$m2a$prior
-  }
-}
+## Set starting parameters:
+start <- init_vals$petralesole$m2a$start
+upper <-  matrix(init_vals$petralesole$m2a$upper)
+lower <- matrix(init_vals$petralesole$m2a$lower)
+prior <- matrix(init_vals$petralesole$m2a$prior)
+
 
 if(!use_previous) {
   start <- matrix(c(-1,0,2,0.01)) #s50, delta, smax,  Eo
@@ -193,7 +172,7 @@ lower <- c(-2, .01, 0.01, 0.01)
 upper <- c(10, 10, 200, 2)
 
 prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
-m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
              time = NULL,
              reml = F,
@@ -203,6 +182,8 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              family =tweedie(link="log"),
              priors=sdmTMBpriors(threshold = prior),
              control = sdmTMBcontrol(
+               lower= list(b_threshold =lower),
+               upper=list(b_threshold=upper),
                start = list(b_threshold = start),
                upper = list(b_threshold = upper),
                lower = list(b_threshold = lower),
@@ -213,7 +194,6 @@ AIC(m2a)
 
 #### Plot fitted relationship ####
 ##### extract estimates ####
-
 Eo <- getEo(model = m2a)
 
 ##### plot ####
@@ -226,18 +206,12 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
      ylab = "po2-prime marginal effect")
 
 ### Fit logistic po2 model ####
-if(use_previous) {
-  if(spc=="petrale sole"){
-  start <- init_vals$petralesole$m3$start
-  upper <- init_vals$petralesole$m3$upper
-  lower <- init_vals$petralesole$m3$lower
-  }
-  if(spc=="sablefish"){
-    start <- init_vals$sablefish$m3$start
-    upper <- init_vals$sablefish$m3$upper
-    lower <- init_vals$sablefish$m3$lower
-  }
-}
+#Starting values
+start <- init_vals$petralesole$m3$start
+upper <-  matrix(init_vals$petralesole$m3$upper)
+lower <- matrix(init_vals$petralesole$m3$lower)
+prior <- matrix(init_vals$petralesole$m3$prior)
+
 
 if(!use_previous) {
   start <- matrix(c(-1.5,log(0.5),20)) #s50, delta, smax,  Eo
@@ -253,7 +227,7 @@ start[3, 1] <- 10 #smax
 lower <- c(-4, -Inf, 0.01)
 upper <- c(4, 3,300)
 
-m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
+m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -263,10 +237,11 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
-               lower = list(b_threshold = lower), 
+               lower = list(b_threshold = lower),
                upper = list(b_threshold = upper)
                )
         )
+
 
 summary(m3)
 
@@ -293,9 +268,6 @@ m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2,
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                newton_loops = 2,
-               eval.max = 1000000L,
-               iter.max = 1000000L,
-               nlminb_loops = 100L
                )
              )
 summary(m4)
@@ -313,7 +285,7 @@ m5 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
              time=NULL,
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
-               newton_loops = 2,
+               newton_loops = 1,
              )
 )
 
@@ -329,10 +301,7 @@ m6 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
              reml=F,
              time=NULL,
              family =tweedie(link="log"),
-             control = sdmTMBcontrol(newton_loops = 2,
-                                     eval.max = 1000000L,
-                                     iter.max = 1000000L,
-                                     nlminb_loops = 100L
+             control = sdmTMBcontrol(newton_loops = 1,
              )
 )
 
@@ -348,10 +317,7 @@ m7 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + p
              reml=F,
              time=NULL,
              family =tweedie(link="log"),
-             control = sdmTMBcontrol(newton_loops = 2,
-                                     eval.max = 1000000L,
-                                     iter.max = 1000000L,
-                                     nlminb_loops = 100L
+             control = sdmTMBcontrol(newton_loops = 1,
              )
 )
 
@@ -367,10 +333,7 @@ m8 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * p
              reml=F,
              time=NULL,
              family =tweedie(link="log"),
-             control = sdmTMBcontrol(newton_loops = 2,
-                                     eval.max = 1000000L,
-                                     iter.max = 1000000L,
-                                     nlminb_loops = 100L
+             control = sdmTMBcontrol(newton_loops = 1,
              )
 )
 
@@ -410,7 +373,7 @@ pars <- pivot_wider(pars, names_from=term, values_from=estimate)
 # Calculate temp-corrected po2 from Eo value #
 dat$mi_pred <- dat$po2*exp(pars$"mi-Eo"* dat$invtemp)
 # Calculate effect of MI # Tim note: probably better to use the logfun function above to calculate the log effect size from po2prime or po2.  
-dat$mi_effect <- pars$"mi-smax" * (1 / (1 + exp(-log(19) * (dat$mi_pred - pars$`mi-s50`) / pars$"mi-delta")) - 1). # this is exponentiated. 
+dat$mi_effect <- pars$"mi-smax" * (1 / (1 + exp(-log(19) * (dat$mi_pred - pars$`mi-s50`) / pars$"mi-delta")) - 1) # this is exponentiated. 
 # Calculate combined depth effect #
 dat$depth_effect_combined <- (dat$log_depth_scaled*pars$log_depth_scaled)+(dat$log_depth_scaled2*pars$log_depth_scaled2)
 
@@ -423,7 +386,7 @@ pars2 <- pivot_wider(pars2, names_from=term, values_from=estimate)
 # alculate depth effects #
 dat$depth_effect_combined2 <- (dat$log_depth_scaled*pars2$log_depth_scaled)+(dat$log_depth_scaled2*pars2$log_depth_scaled2)
 # Calculate po2 effect #
-dat$po2_effect <- ifelse(dat$po2_sc>pars2$`po2_sc-breakpt`,pars2$`po2_sc-breakpt`*pars2$`po2_sc-slope`,dat$`po2_sc`*pars2$`po2_sc-slope`)
+dat$po2_effect <- ifelse(dat$po2_s>pars2$`po2_s-breakpt`,pars2$`po2_s-breakpt`*pars2$`po2_s-slope`,dat$`po2_s`*pars2$`po2_s-slope`)
 
 # Plot depth effects compared between model #
 ggplot(dat, aes(y=depth_effect_combined, x=depth))+geom_line(size=1.3)+geom_line(dat, mapping=aes(y=depth_effect_combined2, x=depth), color="red", size=1.3)+ylab("Depth Effect Combined")
@@ -432,3 +395,5 @@ ggplot(subset(dat, depth>450), aes(y=depth_effect_combined, x=depth))+geom_point
 # Plot metabolic index vs depth #
 ggplot(dat, aes(y=depth, x=mi_pred))+geom_point(aes(color=log(cpue_kg_km2)))+xlab("pO2'")+theme(legend.position=c(0.8, 0.8))
 
+#Plot oxygen vs depth
+ggplot(dat, aes(y=depth, x=po2))+geom_point(aes(color=log(cpue_kg_km2)))+xlab("pO2")+theme(legend.position=c(0.7, 0.8))
