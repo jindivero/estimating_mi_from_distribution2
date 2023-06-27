@@ -367,41 +367,48 @@ get_inits <- function() {
   ### Specify petrale sole starting values and lower / upper limits #####
   start <- matrix(0, nrow = 2, ncol = 1)
   start[1,1] <- 0
-  start[2,1] <- 0
+  start[2,1] <- -0.2
   
   init_vals$petralesole$m1$start <- start
-  init_vals$petralesole$m1$lower <- matrix(data=-Inf, ncol=1, nrow=2)
-  init_vals$petralesole$m1$upper <- matrix(data=Inf, ncol=1, nrow=2)
+  init_vals$petralesole$m1$lower <- c(-Inf -Inf, -Inf, 0.01)
+  init_vals$petralesole$m1$upper <- NULL
   
   start <- matrix(0, nrow = 4, ncol = 1)
-  start[1, 1] <- 3 #s50
-  start[2, 1] <- 1 #delta
-  start[3, 1] <- 1 #smax 
-  start[4, 1] <- 0.3 #Eo
+  start[1, 1] <- -1 #s50
+  start[2, 1] <- 2 #delta
+  start[3, 1] <- 20 #smax 
+  start[4, 1] <- 1.00 #Eo
+  lower <- c(-5, .001, 0.01, 0.01)
+  upper <- c(10, 10, 100, 3)
+  
   
   init_vals$petralesole$m2$start <- start
-  init_vals$petralesole$m2$lower <- c(-2, 0.01, 0.01, 0.01)
-  init_vals$petralesole$m2$upper <- c(20, 20,50, 3)
+  init_vals$petralesole$m2$lower <- lower
+  init_vals$petralesole$m2$upper <- upper
   
   start <- matrix(0, ncol = 1, nrow = 4)
-  start[1, 1] <- 3 #s50
-  start[2, 1] <- 1 #delta
-  start[3, 1] <- 5 #smax 
-  start[4, 1] <- 0.48 #Eo
+  start[1, 1] <- 0.67 #s50
+  start[2, 1] <- 0.44 #delta
+  start[3, 1] <- 150 #smax 
+  start[4, 1] <- 0.01 #Eo
+  lower <- c(-2, .01, 0.01, 0.01)
+  upper <- c(10, 10, 200, 2)
   
   init_vals$petralesole$m2a$start <- start
-  init_vals$petralesole$m2a$lower <-  c(-Inf, -Inf, 0.01, 0.01)
-  init_vals$petralesole$m2a$upper <- c(Inf, Inf,50, Inf)
+  init_vals$petralesole$m2a$lower <-  lower
+  init_vals$petralesole$m2a$upper <- upper
   init_vals$petralesole$m2a$prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
 
   start <- matrix(0, ncol = 1, nrow = 3)
   start[1, 1] <- -1.5 #s50
-  start[2, 1] <- log(0.5) # log delta
-  start[3, 1] <- 20 #smax
+  start[2, 1] <- log(1.1) # log delta
+  start[3, 1] <- 10 #smax
+  lower <- c(-4, -Inf, 0.01)
+  upper <- c(4, 3,300)
   
   init_vals$petralesole$m3$start <- start
-  init_vals$petralesole$m3$lower <-   c(-4, -Inf, 0.01)
-  init_vals$petralesole$m3$upper <- c(4, 3,200)
+  init_vals$petralesole$m3$lower <-   lower
+  init_vals$petralesole$m3$upper <- upper
   return(init_vals)
 }
   
