@@ -3,7 +3,7 @@ install_local <- F
 library(devtools)
 
 if (install_local) devtools::install_local("/Users/juliaindivero/Library/CloudStorage/Dropbox/sdmTMB-mi.zip")
-if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="mi")
+if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="newlogistic")
 library(sdmTMB)
 
 ### load helper functions ####
@@ -109,11 +109,11 @@ if(!use_previous) {
 }
 
 start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- -1 #s50
-start[2, 1] <- 2 #delta
-start[3, 1] <- 20 #smax 
+start[1, 1] <- 0 #s50
+start[2, 1] <- 5 #delta
+start[3, 1] <- 50 #smax 
 start[4, 1] <- 1.00 #Eo
-lower <- c(-5, .001, 0.01, 0.01)
+lower <- c(-2, .1, 0.01, -0.5)
 upper <- c(10, 10, 100, 3)
 
 
@@ -127,8 +127,8 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-               lower = list(b_threshold = lower),
-               upper = list(b_threshold = upper),
+ ##              lower = list(b_threshold = lower),
+##               upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
 
@@ -164,11 +164,11 @@ if(!use_previous) {
   prior <- matrix(normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.3)))
 }
 
-start[1, 1] <- 0.67 #s50
-start[2, 1] <- 0.44 #delta
-start[3, 1] <- 150 #smax 
+start[1, 1] <- 1.5 #s50
+start[2, 1] <- 0.1 #delta
+start[3, 1] <- 50 #smax 
 start[4, 1] <- 0.01 #Eo
-lower <- c(-2, .01, 0.01, 0.01)
+lower <- c(0, 0.01, 0.01, 0.01)
 upper <- c(10, 10, 200, 2)
 
 prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
@@ -182,8 +182,6 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              family =tweedie(link="log"),
              priors=sdmTMBpriors(threshold = prior),
              control = sdmTMBcontrol(
-               lower= list(b_threshold =lower),
-               upper=list(b_threshold=upper),
                start = list(b_threshold = start),
                upper = list(b_threshold = upper),
                lower = list(b_threshold = lower),
@@ -221,10 +219,10 @@ if(!use_previous) {
 
 
 start <- matrix(0, ncol = 1, nrow = 3)
-start[1, 1] <- -1.5 #s50
-start[2, 1] <- log(1.1) # log delta
-start[3, 1] <- 10 #smax
-lower <- c(-4, -Inf, 0.01)
+start[1, 1] <- -1.0 #s50
+start[2, 1] <- log(0.5) # log delta
+start[3, 1] <- 10 #scale
+lower <- c(-4, -15, 0.01)
 upper <- c(4, 3,300)
 
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
