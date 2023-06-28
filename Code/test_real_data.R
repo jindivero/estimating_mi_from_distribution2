@@ -12,8 +12,8 @@ source("Code/util_funs.R")
 ### Load Data ####
 
 
-sci_name <- "Eopsetta jordani"#"Anoplopoma fimbria"
-spc <- "petrale sole"
+sci_name <- "Anoplopoma fimbria" #"Eopsetta jordani"#
+spc <- "sablefish"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
@@ -49,12 +49,7 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 init_vals <- get_inits()
 
 ### Fit Breakpoint model to po2 ####
-#start <- init_vals$petralesole$m1$start
-if(constrain_depth) start <- matrix(c(0,-1))
-if(!constrain_depth)start <- matrix(c(200,-1))
-
-start <- matrix(0,2)
-start[2,1] <- - 0.4
+start <- init_vals$sablefish$m1$start
 
 m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
@@ -86,35 +81,9 @@ plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1]
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
-
-#Use previously saved values
-if(use_previous) {
-  if(spc=="petrale sole"){
-  start <- matrix(init_vals$petralesole$m2$start)
-  upper <- matrix(init_vals$petralesole$m2$upper)
-  lower <- matrix(init_vals$petralesole$m2$lower)
-  }
-  if(spc=="sablefish"){
-    start <- init_vals$sablefish$m2$start
-    upper <- init_vals$sablefish$m2$upper
-    lower <- init_vals$sablefish$m2$lower
-  }
-}
-
-#Or change manually
-if(!use_previous) {
-  start <- matrix(c(3,1,1,0.2)) #s50, delta, smax,  Eo
-  lower <- matrix(c(-2, 0.01, 0.01, 0.01))
-  upper <- matrix(c(20, 20,40, 1.5))
-}
-
-start <- matrix(0, ncol = 1, nrow = 4)
-start[1, 1] <- -1 #s50
-start[2, 1] <- 2 #delta
-start[3, 1] <- 20 #smax 
-start[4, 1] <- 1.00 #Eo
-lower <- c(-5, .001, 0.01, 0.01)
-upper <- c(10, 10, 100, 3)
+start <- init_vals$sablefish$m2$start
+lower<- init_vals$sablefish$m2$lower
+upper<- init_vals$sablefish$m2$upper
 
 
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
@@ -151,25 +120,10 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
 ## Set starting parameters:
-start <- init_vals$petralesole$m2a$start
-upper <-  matrix(init_vals$petralesole$m2a$upper)
-lower <- matrix(init_vals$petralesole$m2a$lower)
-prior <- matrix(init_vals$petralesole$m2a$prior)
 
-
-if(!use_previous) {
-  start <- matrix(c(-1,0,2,0.01)) #s50, delta, smax,  Eo
-  lower <- matrix(c(-2, 0.01, 0.01, 0.1))
-  upper <- matrix(c(20, 20,100, 3))
-  prior <- matrix(normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.3)))
-}
-
-start[1, 1] <- 0.67 #s50
-start[2, 1] <- 0.44 #delta
-start[3, 1] <- 150 #smax 
-start[4, 1] <- 0.01 #Eo
-lower <- c(-2, .01, 0.01, 0.01)
-upper <- c(10, 10, 200, 2)
+start <- init_vals$sablefish$m2a$start
+lower<- init_vals$sablefish$m2a$lower
+upper<- init_vals$sablefish$m2a$upper
 
 prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
 m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
@@ -185,8 +139,6 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
                lower= list(b_threshold =lower),
                upper=list(b_threshold=upper),
                start = list(b_threshold = start),
-               upper = list(b_threshold = upper),
-               lower = list(b_threshold = lower),
                newton_loops = 2))
 
 summary(m2a)
@@ -207,25 +159,9 @@ plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
 
 ### Fit logistic po2 model ####
 #Starting values
-start <- init_vals$petralesole$m3$start
-upper <-  matrix(init_vals$petralesole$m3$upper)
-lower <- matrix(init_vals$petralesole$m3$lower)
-prior <- matrix(init_vals$petralesole$m3$prior)
-
-
-if(!use_previous) {
-  start <- matrix(c(-1.5,log(0.5),20)) #s50, delta, smax,  Eo
-  lower <- matrix(c(-4, -Inf, 0.01))
-  upper <- matrix(c(Inf, Inf,50, Inf))
-}
-
-
-start <- matrix(0, ncol = 1, nrow = 3)
-start[1, 1] <- -1.5 #s50
-start[2, 1] <- log(1.1) # log delta
-start[3, 1] <- 10 #smax
-lower <- c(-4, -Inf, 0.01)
-upper <- c(4, 3,300)
+start <- init_vals$sablefish$m3$start
+upper <-  init_vals$sablefish$m3$upper
+lower <- init_vals$sablefish$m3$lower
 
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
@@ -397,3 +333,7 @@ ggplot(dat, aes(y=depth, x=mi_pred))+geom_point(aes(color=log(cpue_kg_km2)))+xla
 
 #Plot oxygen vs depth
 ggplot(dat, aes(y=depth, x=po2))+geom_point(aes(color=log(cpue_kg_km2)))+xlab("pO2")+theme(legend.position=c(0.7, 0.8))
+
+#Save models
+save(m1,m2,m2a,m3,m4,m5,m6,m7,m8, file="models_sablefish.RObject")
+

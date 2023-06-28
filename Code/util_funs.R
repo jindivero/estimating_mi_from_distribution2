@@ -364,18 +364,11 @@ get_inits <- function() {
 
   
   ### Specify petrale sole starting values and lower / upper limits #####
-  start <- matrix(0, nrow = 2, ncol = 1)
-
-  start[1,1] <- 0
-  start[2,1] <- -0.2
-  start[1,1] <- 200
-  start[2,1] <- -1
-
+  start <- matrix(0,2)
+  start[2,1] <- - 0.4
   
   init_vals$petralesole$m1$start <- start
-  init_vals$petralesole$m1$lower <- c(-Inf -Inf, -Inf, 0.01)
-  init_vals$petralesole$m1$upper <- NULL
-  
+
   start <- matrix(0, nrow = 4, ncol = 1)
   start[1, 1] <- -1 #s50
   start[2, 1] <- 2 #delta
@@ -383,7 +376,6 @@ get_inits <- function() {
   start[4, 1] <- 1.00 #Eo
   lower <- c(-5, .001, 0.01, 0.01)
   upper <- c(10, 10, 100, 3)
-  
   
   init_vals$petralesole$m2$start <- start
   init_vals$petralesole$m2$lower <- lower
@@ -405,7 +397,7 @@ get_inits <- function() {
   start <- matrix(0, ncol = 1, nrow = 3)
   start[1, 1] <- -1.5 #s50
   start[2, 1] <- log(1.1) # log delta
-  start[3, 1] <- 10 #smax
+  start[3, 1] <- 100 #smax
   lower <- c(-4, -Inf, 0.01)
   upper <- c(4, 3,300)
   
