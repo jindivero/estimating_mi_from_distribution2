@@ -306,11 +306,17 @@ logfun <- function(x, model, mi = F) {
     parnames <- names(parfit$value)
     
     s50 <- parfit$value[grep("s50", parnames)]
-    s95 <- s50 + exp(parfit$value[grep("s95", parnames)] )
+    s95 <- (parfit$value[grep("s95", parnames)] )
     delta <- s95 - s50
     smax <- parfit$value[grep("s_max", parnames)]
   }
-  return(smax * ((1 + exp(-log(19) * (x - s50)/(delta)))^(-1) - 1))
+  a <- log(smax / (log(0.5) + smax) - 1)
+  b <- log(smax / (log(0.95) + smax) - 1)
+  beta0 <- -a + s50 * (b - a) / delta
+  beta1 <- (a - b) / delta
+  logmu <- smax * (1 / ( 1 + exp( - beta0 - beta1 * x)) -1)
+  
+  return(logmu)
 } 
 getEo <- function(model) {
   parfit <- model$sd_report
