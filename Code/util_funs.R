@@ -344,26 +344,26 @@ get_inits <- function() {
   start <- matrix(0, ncol = 1, nrow = 4)
   start[1, 1] <- 2 #s50
   start[2, 1] <- 1 #delta
-  start[3, 1] <- 20 #smax 
-  start[4, 1] <- 1.50 #Eo  #Tim used 1.00 on 6/26
+  start[3, 1] <- 1500 #smax
+  start[4, 1] <- 1 #Eo  #Tim used 1.00 on 6/26
   init_vals$sablefish$m2$start <- start
-  init_vals$sablefish$m2$lower <- c(-Inf, .001, 0, 0)
+  init_vals$sablefish$m2$lower <- c(-Inf, .001, 0, 0.01)
   init_vals$sablefish$m2$upper <- c(Inf, Inf,Inf, Inf)
-  
+
   start <- matrix(0, ncol = 1, nrow = 4)
   start[1, 1] <- 2 #s50
-  start[2, 1] <- (1) #delta
-  start[3, 1] <- 10 #smax 
-  start[4, 1] <- 0.68 #Eo
+  start[2, 1] <- 1 #delta
+  start[3, 1] <- 1150 #smax
+  start[4, 1] <- 0.6 #Eo  #Tim used 1.00 on 6/26
   init_vals$sablefish$m2a$start <- start
-  init_vals$sablefish$m2a$lower <- c(-Inf, 0.01, 0, 0)
-  init_vals$sablefish$m2a$upper <- c(Inf, Inf,50, Inf)
-  init_vals$sablefish$m2a$prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
+  init_vals$sablefish$m2a$lower <- c(-Inf, .001, 0.01, 0)
+  init_vals$sablefish$m2a$upper <- c(Inf, Inf,2000, Inf)
+  init_vals$sablefish$m2a$prior <- normal(c(NA, NA, NA, 0.3306), c(NA, NA, NA, 0.173))
   
   start <- matrix(0, ncol = 1, nrow = 3)
   start[1, 1] <- -1.65 #s50 #Tim used -1.5 on 6/26
-  start[2, 1] <- log(0.5) # log delta
-  start[3, 1] <- 40 #smax
+  start[2, 1] <- 0.5 # log delta
+  start[3, 1] <- 200 #smax
   init_vals$sablefish$m3$start <- start
   init_vals$sablefish$m3$lower <- matrix(data=-Inf, ncol=1, nrow=3)
   init_vals$sablefish$m3$upper <- matrix(data=Inf, ncol=1, nrow=3)
@@ -398,7 +398,7 @@ get_inits <- function() {
   init_vals$petralesole$m2a$start <- start
   init_vals$petralesole$m2a$lower <-  lower
   init_vals$petralesole$m2a$upper <- upper
-  init_vals$petralesole$m2a$prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
+  init_vals$petralesole$m2a$prior <- normal(c(NA, NA, NA, 0.3306), c(NA, NA, NA, 0.173))
 
   start <- matrix(0, ncol = 1, nrow = 3)
   start[1, 1] <- -1.5 #s50
