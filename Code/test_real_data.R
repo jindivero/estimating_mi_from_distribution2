@@ -12,14 +12,14 @@ source("Code/util_funs.R")
 ### Load Data ####
 
 
-sci_name <- "Eopsetta jordani"#"Anoplopoma fimbria"
-spc <- "petrale sole"
+sci_name <- "Anoplopoma fimbria"#"Sebastolobus altivelis" #"Anoplopoma fimbria" #"Eopsetta jordani"#"Anoplopoma fimbria"
+spc <- "sablefish"
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
-#Constrain depth for petrale
+#Constrain depth?
 constrain_depth <- F
-if(constrain_depth) dat <- subset(dat, depth<500)
+if(constrain_depth) dat <- subset(dat, depth<600)
 
 ## Scale, rename, and calculate variables ##
 dat$temp_s <- (scale(dat$temp))
@@ -48,15 +48,22 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 ## Get initial values ##
 init_vals <- get_inits()
 
+### Plot data vs. depth and po2 ####
+ggplot(data = dat, aes(x = po2, y = -depth, col = log(cpue_kg_km2+1))) +
+  geom_point() +
+  scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) +
+  xlim(c(0, 16))
 ### Fit Breakpoint model to po2 ####
 #start <- init_vals$petralesole$m1$start
 if(constrain_depth) start <- matrix(c(0,-1))
 if(!constrain_depth)start <- matrix(c(200,-1))
 
 start <- matrix(0,2)
-start[2,1] <- - 0.4
-
-m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
+start[1,1] <- 0.5 # slope
+start[2,1] <- -1.00 # threshold
+lower <- c(0.01, -4)
+upper <- c(2, 2)
+m1 <- sdmTMB(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
              time = NULL,
              reml = F,
@@ -66,6 +73,8 @@ m1 <- sdmTMB(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_sca
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
+#               lower = list(b_threshold = lower), 
+#               upper = list(b_threshold = upper),
                newton_loops = 2))
 
 summary(m1)
@@ -78,11 +87,12 @@ m1_pars <- m1$sd_report$par.fixed
 m1_parnames <- names(m1_pars)
 b_threshold <- m1_pars[grep("b_threshold", m1_parnames)]
 ##### plot ####
-plot(dat$po2, exp(sapply(X = dat$po2_s, FUN = brkptfun, b_slope = b_threshold[1], b_thresh = b_threshold[2])),
-     ylab = "po2 marginal effect", 
-     main="Breakpoint-pO2",
-     xlab="pO2",
-     xlim = c(0,5),)
+dat$thresh_pred <- exp(brkptfun(x = dat$po2_s, b_slope = b_threshold[1], b_thresh = b_threshold[2]))
+ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
+  geom_jitter(width = 0.1, height = 0.01) +
+  scale_colour_viridis_c(limits = c(0, 5), oob = scales::squish) +
+  xlim(c(0,5))
+  
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
@@ -127,8 +137,8 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
- ##              lower = list(b_threshold = lower),
-##               upper = list(b_threshold = upper),
+               #lower = list(b_threshold = lower),
+               #upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
 
@@ -141,12 +151,13 @@ AIC(m2)
 Eo <- getEo(model = m2)
 
 ##### plot ####
-po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
-
-plot(po2_prime, exp(logfun(po2_prime, model = m2, mi = T)),
-     xlim = c(0,5),
-     main="Eo estimation and logistic pO2'",
-     ylab = "po2-prime marginal effect")
+dat$po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
+dat$Eo_unconstrained <- exp(logfun(dat$po2_prime, model = m2, mi = T))
+ggplot(dat, aes(x = po2_prime, y = Eo_unconstrained, col = log(cpue_kg_km2 + 1))) +
+  geom_jitter(width = 0.1, height = 0.01) +
+  scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) + 
+  xlim(c(0,5))
+  
 
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
@@ -171,7 +182,7 @@ start[4, 1] <- 0.01 #Eo
 lower <- c(0, 0.01, 0.01, 0.01)
 upper <- c(10, 10, 200, 2)
 
-prior <- normal(c(NA, NA, NA, 0.448), c(NA, NA, NA, 0.15))
+prior <- normal(c(NA, NA, NA, 0.331), c(NA, NA, NA, 0.176))
 m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
              time = NULL,
@@ -196,12 +207,17 @@ Eo <- getEo(model = m2a)
 
 ##### plot ####
 ## Calculate po2 prime from parameter ##
-po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
+dat$po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
 
-plot(po2_prime, exp(logfun(po2_prime, model = m2a, mi = T)),
-     xlim = c(0,5),
-     main="Eo estimation and logistic pO2 (with prior)'",
-     ylab = "po2-prime marginal effect")
+##### plot ####
+
+dat$Eo_constrained <- exp(logfun(dat$po2_prime, model = m2a, mi = T))
+ggplot(dat, aes(x = po2_prime, y = Eo_constrained, col = log(cpue_kg_km2 + 1))) +
+  geom_jitter(width = 0.1, height = 0.01) +
+  scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) +
+  xlim(c(0,5))
+  
+
 
 ### Fit logistic po2 model ####
 #Starting values
@@ -222,7 +238,7 @@ start <- matrix(0, ncol = 1, nrow = 3)
 start[1, 1] <- -1.0 #s50
 start[2, 1] <- log(0.5) # log delta
 start[3, 1] <- 10 #scale
-lower <- c(-4, -15, 0.01)
+lower <- c(-1.5, -15, 0.01)
 upper <- c(4, 3,300)
 
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
@@ -246,14 +262,14 @@ summary(m3)
 
 #### Plot fitted relationship ####
 ##### extract estimates ####
-
+dat$logistic_pos <- exp(logfun(dat$po2_s, model = m3, mi = F))
 ##### plot ####
-plot(dat$po2, exp(logfun(dat$po2_s, model = m3, mi = F)),
-     main="Logistic-pO2",
-     xlim = c(0,5),
-     ylab = "po2 marginal effect",
-     xlab="pO2"
-     )
+ggplot(dat, aes(x = po2, y = logistic_pos, col = log(cpue_kg_km2 + 1))) +
+  geom_jitter(width = 0.1, height = 0.01) +
+  scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) + 
+  xlim(c(0,5))
+
+
 
 ### Fit null model ####
 m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
