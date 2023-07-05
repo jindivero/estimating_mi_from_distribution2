@@ -109,6 +109,14 @@ if(constrain_depth){
   
 }
 
+start <- matrix(0, nrow = 4)
+start[1,1] <- -1 # x50
+start[2,1] <- 1 # delta
+start[3,1] <- 40 #smax
+start[4,1] <- 0.4 #Eo
+lower <- c(-1.4, 0.01, 0.01, 0.01)
+upper <- c(10, 5, 100, 2)
+
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
