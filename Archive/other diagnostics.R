@@ -23,13 +23,14 @@ convergence1 <- lapply(fits, extract_convergence)
 convergence2 <- lapply(fits2, extract_convergence)
 convergence3 <- lapply(fits3, extract_convergence)
 convergence4 <- lapply(fits4, extract_convergence)
-
+convergence5 <- lapply(fits5, extract_convergence)
 
 ##Bind together
 convergence1 <- bind_rows(convergence1)
 convergence2 <- bind_rows(convergence2)
 convergence3 <- bind_rows(convergence3)
 convergence4 <- bind_rows(convergence4)
+convergence5 <- bind_rows(convergence5)
 
 ##Add column for data simulation and model
 convergence1$sim <- 1:100

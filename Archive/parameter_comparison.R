@@ -19,17 +19,18 @@ theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blan
 load("~/Dropbox/Mac/Documents/GitHub/thresholds_mi_distribution/thresholds_mi_distribution/current/output/model_fits.Rdata")
 
 ##Specify all parameters from data generation for reference
-x50 <- -1 # same as sablefish; had been 2 in previous data simulation
-delta <- 1 #same as sablefish; had been 2 in previous data simulation
-b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68) #basically same as real sablefish
-beta1 <- 1.5 #depth #same as sablefish
-beta2 <- -1 #depth^2 #same as sablefish
-beta3 <- 50 # maximum effect of MI; had been 4 in previous data simulation
-phi <- 7 #estimated at 16 in real sablefish data
-p <- 1.5 #same as sablefish
-range <- 80 #80 in sablefish; had been 0.3 in previous data simulation
-sigma_O <- 1.5 #1.81 in real sablefish; had been 0.5 in previous data simulation
-Eo <- 0.291
+x50 <- 2
+delta <- 2 # how much bigger is MI at 95% of logistic compared to 50% of logistic
+beta1 <- 1
+beta2 <- -0.25
+beta3 <- 4 # maximum effect of MI: means that catch above threshold is at most exp(beta3) times larger than at MI = 0
+beta0 <- 5 # log mean catch when at average depth and MI = exceeds threshold
+b_years <- c(0.1,0,0,0.2,0.2)
+phi <- 7
+p <- 1.5
+range <- 0.3
+sigma_O <- 0.5
+Eo <- 0.3
 
 ###Comparing how starting values impacted parameter estimation for model with no prior
 ##Function to extract from all fits
@@ -60,13 +61,29 @@ clean_pars <- function(pars, fits){
   return(pars)
 }
 
-fits_all <- list(fits, fits2, fits3, fits4)
+##Apply to each
+#pars1 <- clean_pars(pars1, fits=fits)
+#pars2 <- clean_pars(pars3, fits=fits2)
+
+##Add column to label model
+#pars1$model <- "Start at true value"
+#pars2$model <- "Start at 10% true value"
+
+##Merge together for plotting
+#pars <- rbind(pars1,pars2)
+#Boxplot of estimates compared to true value
+#ggplot(pars, aes(y=estimate, x=term))+geom_boxplot(aes(group=model, fill=model))+facet_wrap("term", scales="free")+theme(legend.position = "none")
+
+###NOTE: Because no difference, going to use fits for rest of comparison
+#Make list of fits
+
+fits_all <- list(fits, fits2, fits3)
 
 ##Create list of names of models
-model_names <- c("Usual Case, No Prior", "Usual Case, Prior", "Unusual Case, No Prior", "Unusual Case, Prior")
+model_names <- c("Data limited (no prior)", "Data Rich (Correct prior)", "Unusual Case (Incorrect prior)")
 
-##Set true pars vectors of values and name
-true_pars2 <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), estimate=c(beta1, beta2, delta, x50, beta3, range, sigma_O, phi, p, Eo, b_years))
+##Set true pars vectors of values and names
+true_pars2 <- data.frame(term=c("(Intercept)", "log_depth_sc", "log_depth_sc2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), estimate=c(beta0, beta1, beta2, delta, x50, beta3, range, sigma_O, phi, p, 0.3, b_years))
 pars_names <- c("(Intercept)","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015", "log_depth_sc", "log_depth_sc2", "mi-s50", "mi-delta", "mi-smax", "mi-Eo", "range", "phi", "sigma_O", "tweedie_p") 
 
 ##Extract pars for the other two models
@@ -92,8 +109,6 @@ pars <- rbind(pars1,pars2,  pars3)
 saveRDS(pars, "parameter_estimates.rds")
 #Boxplot of estimates compared to true value
 ggplot(pars, aes(y=estimate, x=term))+geom_boxplot(aes(group=model, fill=model))+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars1, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-
 #Just Eo
 pars$model <- str_wrap(pars$model, width=10)
 ggplot(subset(pars, term=='mi-Eo'), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+geom_hline(data = subset(true_pars2, term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="none")

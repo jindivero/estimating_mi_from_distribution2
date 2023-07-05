@@ -288,8 +288,20 @@ all_hauls <- rbind(p, absent.df)
 all_hauls$trawl_id <- as.numeric(all_hauls$trawl_id)
 return(all_hauls)
 }
+# Breakpoint functions ####
+brkptfun <- function(x, b_slope, b_thresh){
+  brkpt_fun <- function(x, b_slope, b_thresh){
+  if (x < b_thresh) {
+    pred = (x - b_thresh) * b_slope 
+    } else {
+      pred = 0
+      }
+    return(pred)
+    }
+  return(sapply(X = x,FUN = brkpt_fun,  b_slope, b_thresh))
+}
 
-brkptfun <- function(x, b_slope, b_thresh) min(0, b_slope *  (x - b_thresh))
+
 logfun <- function(x, model, mi = F) {
   if (mi) {
     parfit <- model$sd_report
