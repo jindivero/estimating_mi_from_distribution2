@@ -362,15 +362,16 @@ get_inits <- function() {
   init_vals$sablefish$m2$lower <- c(-Inf, .001, 0, 0.01)
   init_vals$sablefish$m2$upper <- c(Inf, Inf,Inf, Inf)
 
-  start <- matrix(0, ncol = 1, nrow = 4)
-  start[1, 1] <- 2 #s50
-  start[2, 1] <- 1 #delta
-  start[3, 1] <- 1150 #smax
-  start[4, 1] <- 0.6 #Eo  #Tim used 1.00 on 6/26
+  start[1, 1] <- 1.5 #s50
+  start[2, 1] <- 0.1 #delta
+  start[3, 1] <- 50 #smax 
+  start[4, 1] <- 0.01 #Eo
+  lower <- c(0, 0.01, 0.01, 0.01)
+  upper <- c(10, 10, 200, 2)
   init_vals$sablefish$m2a$start <- start
-  init_vals$sablefish$m2a$lower <- c(-Inf, .001, 0.01, 0)
-  init_vals$sablefish$m2a$upper <- c(Inf, Inf,2000, Inf)
-  init_vals$sablefish$m2a$prior <- normal(c(NA, NA, NA, 0.3306), c(NA, NA, NA, 0.173))
+  init_vals$sablefish$m2a$lower <- lower
+  init_vals$sablefish$m2a$upper <- upper
+  init_vals$sablefish$m2a$prior <- normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455))
   
   start <- matrix(0, ncol = 1, nrow = 3)
   start[1, 1] <- -1.65 #s50 #Tim used -1.5 on 6/26
@@ -395,6 +396,13 @@ get_inits <- function() {
   lower <- c(-5, .001, 0.01, 0.01)
   upper <- c(10, 10, 100, 3)
   
+  if(constrain_depth){
+    start <- matrix(c(0.7,0.5,150,0.01))
+    lower <- matrix(c(0.01, 0.1,1, 0.1))
+    upper <- matrix(c(Inf, Inf, Inf, Inf))
+    
+  }
+  
   init_vals$petralesole$m2$start <- start
   init_vals$petralesole$m2$lower <- lower
   init_vals$petralesole$m2$upper <- upper
@@ -406,6 +414,12 @@ get_inits <- function() {
   start[4, 1] <- 0.01 #Eo
   lower <- c(-2, .01, 0.01, 0.01)
   upper <- c(10, 10, 200, 2)
+  
+  if(constrain_depth){
+    start <- matrix(c(1,0.1,150,0.3306))
+    lower <- matrix(c(0.01, 0.1,1, 0.01))
+    upper <- matrix(c(Inf, Inf, Inf, Inf))
+  }
   
   init_vals$petralesole$m2a$start <- start
   init_vals$petralesole$m2a$lower <-  lower
@@ -423,6 +437,35 @@ get_inits <- function() {
   init_vals$petralesole$m3$lower <-   lower
   init_vals$petralesole$m3$upper <- upper
 
+  start <- matrix(0,2)
+  start[1,1] <- 1 # slope
+  start[2,1] <- -1.00 # threshold
+  init_vals$"Sebastolobus altivelis"$m1$start <- start
+  init_vals$"Sebastolobus altivelis"$m1$lower <- c(0.01, -4)
+  init_vals$"Sebastolobus altivelis"$m1$upper <- c(2, 2)
+
+  start <- matrix(c(-1,1,100,0.4))
+  init_vals$"Sebastolobus altivelis"$m2$start <- start
+  init_vals$"Sebastolobus altivelis"$m2$lower <- c(-1.4, 0.01, 0.01, 0.01)
+  init_vals$"Sebastolobus altivelis"$m2$upper <- c(10, 5, 100, 2)
+
+  start[1, 1] <- 1.5 #s50
+  start[2, 1] <- 0.1 #delta
+  start[3, 1] <- 50 #smax 
+  start[4, 1] <- 0.01 #Eo
+  init_vals$"Sebastolobus altivelis"$m2a$start <- start
+  init_vals$"Sebastolobus altivelis"$m2a$lower <-c(0, 0.01, 0.01, 0.01)
+  init_vals$"Sebastolobus altivelis"$m2a$upper <-c(10, 10, 200, 2)
+  
+  start <- matrix(0, ncol = 1, nrow = 3)
+  start[1, 1] <- -1.0 #s50
+  start[2, 1] <- log(0.5) # log delta
+  start[3, 1] <- 10 #scale
+  init_vals$"Sebastolobus altivelis"$m3$start <- start
+  init_vals$"Sebastolobus altivelis"$m3$lower <-c(-1.5, -15, 0.01)
+  init_vals$"Sebastolobus altivelis"$m3$upper <-c(4, 3,300)
+  
+  
   return(init_vals)
 }
   
