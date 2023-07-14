@@ -31,9 +31,10 @@ install.packages("tweedie")
 library(tweedie)
 install.packages("ggridges")
 library(ggridges)
+library(viridis)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 19))
+theme_set(theme_bw(base_size = 25))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 ### load helper functions ####
@@ -834,3 +835,77 @@ ggplot(nll_combined, aes(y=Below_s50,x=Model, group=Model, fill = Model))+
   # facet_wrap("Model", ncol=2)+
   xlab("Model")+
   ylab("Log-Likelihood for Observations Below true s50 of pO2'")
+
+### Logistic shape comparison ###
+## Calculate po2_prime effect for each model ##
+# Function #
+calculate_po2_prime <- function(dat, model) {
+  if(!is.character(model)){
+  parfit <- model$sd_report
+  npars <- length(parfit$value)
+  parnames <- names(parfit$value)
+
+  Eo <- parfit$value[grep("Eo", parnames)]
+  dat$po2_prime <-  dat$po2 * exp(Eo * dat$invtemp)
+  dat$smax <- parfit$value[grep("s_max", parnames)]
+  }
+  if(is.character(model)){
+    dat <- NA
+}
+  return(dat)
+}
+# Apply #
+simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
+
+
+## Calculate po2 prime effect ##
+# Function #
+logfun_all <- function(dat, model) {
+  if(!is.character(model)){
+    dat$logfun <- exp(logfun(dat$po2_prime, model = model, mi = T))
+  }
+  if(is.character(model)){
+    dat <- NA
+  }
+  return(dat)
+}
+
+# Apply #
+simdats1 <- mapply(FUN=logfun_all, simdats1, fits)
+
+
+# Plot #
+simdats1 <- keep(.x=simdats1, .p=is.data.frame)
+simdats2 <- simdats1[1:5]
+ggplot(bind_rows(simdats2, .id="df"), aes(po2_prime, logfun, colour=as.factor(smax))) +
+  geom_point(size=0.1)+
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("pO2'")+
+  ylab("pO2' effect")
+
+# simulation version #
+smax_test <- as.data.frame(dat$mi_usual)
+colnames(smax_test) <- "po2_prime"
+logfun_basic <- function(mi, smax, s50, delta){
+  a <- log(smax / (log(0.5) + smax) - 1)
+  b <- log(smax / (log(0.95) + smax) - 1)
+  beta0 <- -a + s50 * (b - a) / delta
+  beta1 <- (a - b) / delta
+  logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * mi)) -1))
+}
+smax_test$logmu1 <- logfun_basic(smax_test$po2_prime, smax=5, s50=x50, delta)
+smax_test$logmu2 <- logfun_basic(smax_test$po2_prime, smax=20, s50=x50, delta)
+smax_test$logmu3 <- logfun_basic(smax_test$po2_prime, smax=50, s50=x50, delta)
+smax_test$logmu4 <- logfun_basic(smax_test$po2_prime, smax=100, s50=x50, delta)
+smax_test$logmu5 <- logfun_basic(smax_test$po2_prime, smax=500, s50=x50, delta)
+smax_test$logmu6 <- logfun_basic(smax_test$po2_prime, smax=1000, s50=x50, delta)
+smax_test$logmu7 <- logfun_basic(smax_test$po2_prime, smax=10000, s50=x50, delta)
+
+smax_test <- pivot_longer(smax_test, 2:8)
+
+ggplot(smax_test, aes(x=po2_prime, y=value))+geom_point(aes(group=name, color=name))+
+  scale_colour_viridis(discrete=T)+
+  xlab("pO2'")+
+  ylab("pO2' effect")+
+  scale_colour_discrete(type="viridis", "smax value", labels=c("5", "20", "50", "100", "500", "1000", "10000"))+theme(legend.position=c(0.8,0.2))
+

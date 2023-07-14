@@ -14,8 +14,8 @@ theme_set(theme_bw(base_size = 15))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 ### Load Data ####
-sci_name <- "Sebastolobus altivelis" #"Eopsetta jordani" #"Anoplopoma fimbria"
-spc <- "longspine thornyhead" # "petrale sole"#"longspine thornyhead"  #"sablefish"
+sci_name <- "Anoplopoma fimbria" #"Sebastolobus altivelis" #"Eopsetta jordani" #"Anoplopoma fimbria"
+spc <- "sablefish"#"longspine thornyhead" # "petrale sole" #
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
@@ -61,7 +61,7 @@ ggplot(data = dat, aes(x = po2, y = -depth, col = log(cpue_kg_km2+1))) +
   xlim(c(0, 16))
 
 ### Fit Breakpoint model to po2 ####
-start <- init_vals$"Sebastolobus altivelis"$m1$start
+start <- init_vals$sablefish$m1$start
 #lower<- init_vals$"Sebastolobus altivelis"$m1$lower
 #upper <- init_vals$"Sebastolobus altivelis"$m1$upper
 m1 <- sdmTMB(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
@@ -97,8 +97,10 @@ ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
-start <- init_vals$"Sebastolobus altivelis"$m2$start
-
+start <- init_vals$sablefish$m2$start
+lower <- init_vals$"Sebastolobus altivelis"$m2$lower
+upper <- init_vals$"Sebastolobus altivelis"$m2$upper
+  
 start <- matrix(c(-1,1,100,0.4))
 
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
@@ -112,7 +114,7 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
            # lower = list(b_threshold = lower),
-              # upper = list(b_threshold = upper),
+             #  upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
 
@@ -137,9 +139,7 @@ ggplot(dat, aes(x = po2_prime, y = Eo_unconstrained, col = log(cpue_kg_km2 + 1))
 ### Fit Eo estimation - po2 prime model (with prior) ####
 ## Set starting parameters:
 
-start <- init_vals$petralesole$m2a$start
-lower <- init_vals$petralesole$m2a$lower
-upper <- init_vals$petralesole$m2a$upper
+start <- init_vals$sablefish$m2a$start
 
 prior <- normal(c(NA, NA, NA, 0.331), c(NA, NA, NA, 0.176))
 
@@ -181,9 +181,9 @@ ggplot(dat, aes(x = po2_prime, y = Eo_constrained, col = log(cpue_kg_km2 + 1))) 
 
 ### Fit logistic po2 model ####
 #Starting values (work for both all depths and depth-constraine)
-start <- init_vals$petralesole$m3$start
-upper <-  matrix(init_vals$petralesole$m3$upper)
-lower <- matrix(init_vals$petralesole$m3$lower)
+start <- init_vals$sablefish$m3$start
+upper <-  matrix(init_vals$sablefish$m3$upper)
+lower <- matrix(init_vals$sablefish$m3$lower)
 
 m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
@@ -195,8 +195,8 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
-               #lower = list(b_threshold = lower),
-               #upper = list(b_threshold = upper)
+             #  lower = list(b_threshold = lower),
+             #  upper = list(b_threshold = upper)
                )
         )
 
