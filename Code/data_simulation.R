@@ -34,7 +34,7 @@ library(ggridges)
 library(viridis)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 25))
+theme_set(theme_bw(base_size = 30))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 ### load helper functions ####
@@ -74,8 +74,8 @@ dat$year <- as.factor(dat$year)
 
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
-simulate_fish<- function(dat,mesh, x50, delta, smax, Eo) {
-  # x50 <- 2 # same as sablefish= 0.88; had been 2 in previous data simulation
+simulate_fish<- function(dat,mesh, s50, delta, smax, Eo) {
+  # s50 <- 2 # same as sablefish= 0.88; had been 2 in previous data simulation
   #  delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
   b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68) #basically same as real sablefish
   beta1 <- 1.5 #depth #same as sablefish
@@ -95,7 +95,7 @@ simulate_fish<- function(dat,mesh, x50, delta, smax, Eo) {
                          sigma_O=sigma_O,
                          sigma_E=NULL,
                          mesh=mesh,
-                         threshold_coefs=c(x50, delta, smax, Eo),
+                         threshold_coefs=c(s50, delta, smax, Eo),
                          B=c(b_years, beta1, beta2),
                          seed=seed)
   dat$sim <- sim$observed
@@ -103,24 +103,24 @@ simulate_fish<- function(dat,mesh, x50, delta, smax, Eo) {
 }
 
 ##Set parameter values for data generation and model fitting
-x50 <-0.88 # same as sablefish= 0.88; had been 2 in previous data simulation
-delta <- 0.56 #same as sablefish = 0.57; had been 2 in previous data simulation
-smax <- 50 # maximum effect of MI; had been 4 in previous data simulation
-Eo <- 0.291
-Eo2 <- 0.733
+s50 <-1 # same as sablefish= 0.88
+delta <- 0.5 #same as sablefish = 0.57
+smax <- 50 # maximum effect of MI
+Eo <- 0.3
+Eo2 <- 0.7
 
 #Set number of iterations
 n <-100 #Number of simulations
 simdat <- map(seq_len(n), ~simulate_fish(dat = dat,
                         mesh = mesh,
-                        x50 = x50,
+                        s50 = s50,
                         delta = delta,
                         smax = smax,
                         Eo = Eo))
 
 simdat2 <- map(seq_len(n), ~simulate_fish(dat = dat,
                             mesh = mesh,
-                            x50 = x50,
+                            s50 = s50,
                             delta = delta,
                             smax = smax,
                             Eo = Eo2))
@@ -128,24 +128,28 @@ simdat2 <- map(seq_len(n), ~simulate_fish(dat = dat,
 ###Sanity checks on simulated data
 
 ## Compare one to the real sablefish data ##
+sanity <- F
+if(sanity){
 sim_test <- simdat[[1]]
 sim_test2 <- simdat2[[1]]
 
 ggplot(dat, aes(x=po2_s,y=cpue_kg_km2))+geom_point(size=0.6)+geom_point(sim_test, mapping=aes(x=po2_s, y=sim), color="blue", size=0.6)
 ggplot(sim_test, aes(x=po2,y=observed))+geom_point()
 ggplot(sim_test2, aes(x=po2,y=observed))+geom_point()
+}
 
 #Save simulated data
+save <- F
+if(save){
 saveRDS(data_sims_usual, "data_sims_usual.rds")
 saveRDS(data_sims_weird, "data_sims_weird.rds")
-saveRDS(data_sims_usual_CV, "data_sims_usual_CV.rds")
-saveRDS(data_sims_weird_CV, "data_sims_weird_CV.rds")
+}
 
 ## Fit Model 1: No priors ##
 ##Set starting parameters
 #Correct values
 start <- matrix(0, ncol = 1, nrow = 4)
-start[1,1] <- x50
+start[1,1] <- s50
 start[2,1] <- delta
 start[3,1] <- smax
 start[4,1] <- Eo
@@ -155,14 +159,14 @@ start2 <- matrix(0.08, ncol = 1, nrow = 4)
 
 #Slightly farther
 start3 <- matrix(0, ncol = 1, nrow = 4)
-start3[1,1] <- x50*0.3
+start3[1,1] <- s50*0.3
 start3[2,1] <- delta*0.3
 start3[3,1] <- smax*0.3
 start3[4,1] <- Eo*0.3
 
 #With weird Eo
 start4 <- matrix(0, ncol = 1, nrow = 4)
-start4[1,1] <- x50
+start4[1,1] <- s50
 start4[2,1] <- delta
 start4[3,1] <- smax
 start4[4,1] <- Eo2
@@ -214,12 +218,12 @@ fits4 <- lapply(simdat2, run_sdmTMB_2,
 
 #Save models
 #save(fits, fits1, fits2, fits3, fits_b, fits_c, file="model_fits.Rdata")
+if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")
+}
 
 ### Evaluate model performance ###
 ## Set true pars vectors of values and name ##
-x50 <- 0.88
-delta <-0.56
 b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68)
 beta1 <- 1.5
 beta2 <- -1
@@ -228,104 +232,25 @@ phi <- 16
 p <- 1.51
 range <- 85
 sigma_O <- 1.77
-Eo <- 0.291
-Eo2 <- 0.733
 # Make list of parameter names"
 pars_names <- c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015")
 true_pars <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), 
-                         estimate=c(beta1, beta2, delta, x50, smax, range, sigma_O, phi, p, Eo, b_years))
+                         estimate=c(beta1, beta2, delta, s50, smax, range, sigma_O, phi, p, Eo, b_years))
 true_pars2 <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), 
-                         estimate=c(beta1, beta2, delta, x50, smax, range, sigma_O, phi, p, Eo2, b_years))
+                         estimate=c(beta1, beta2, delta, s50, smax, range, sigma_O, phi, p, Eo2, b_years))
 # Set model names #
 model_names <- c("Typical Case, Unconstrained", "Typical Case, Prior Constrained", "Unusual Case, Unconstrained", "Unusual Case, Prior Constrained")
 
 
-## Functions for extracting parameter estimates and diagnostics ##
-# Extract parameter estimates #
-extract_pars <- function(x){
-  if(!is.character(x)){
-    par_estimates <- as.data.frame(tidy(x, conf.int = TRUE, effects="fixed"))
-    par_estimates_rand <- as.data.frame(tidy(x, conf.int = TRUE, effects="ran_pars"))
-    par_estimates <- bind_rows(par_estimates, par_estimates_rand)
-    return(par_estimates)
-  }
-  if(is.character(x)){
-    return(NA)
-  }
-}
-
-# Function to clean up pars for plotting #
-clean_pars <- function(pars, fits){
-  names(pars) <- c(1:length(fits))
-  #Remove models with errors
-  pars <- keep(pars, function(x) !is.logical(x))
-  #Combine into single dataframe, with column of simulation number
-  pars <- bind_rows(pars,.id="id")
-  return(pars)
-}
-
-# Aggregate errors #
-extract_convergence <- function(x){
-  if(!is.character(x)){
-    convergence <- as.data.frame(x[["model"]][["convergence"]])
-    colnames(convergence) <- "convergence"
-    convergence$iterations <- x$model$iterations
-    convergence$message <- x$model$message
-    convergence$evaluations_function <- x$model$evaluations[1]
-    convergence$evaluations_gradient <- x$model$evaluations[2]
-  }
-  if(is.character(x)){
-    convergence <- as.data.frame(matrix(ncol=5, nrow=1, NA))
-    colnames(convergence) <- c("convergence", "iterations", "message", "evaluations_function", "evaluations_gradient")
-    convergence[,3] <- paste(x[[1]])
-  }
-  cons <- bind_rows(convergence)
-  return(cons)
-}
-
-# Extract if positive definite hessian #
-
-# Extract hessian matrix T/F value #
-extract_pdHess <- function(x){
-  if(!is.character(x)){
-    pdh <- as.data.frame(x$pos_def_hessian)
-    return(pdh)
-  }
-}
-
-# Sum up across all iterations #
-extract_pdHess2 <- function(pdHess){
-  pdHess <- bind_rows(pdHess)
-  pdHess$sim <- as.numeric(row.names(pdHess))
-  pdHess$sim <- as.character(pdHess$sim)
-  pdHess$neg_def_hessian <- ifelse(pdHess$"x$pos_def_hessian"=="TRUE", 1,0)
-  number_negdHess <- print(sum(pdHess$neg_def_hessian))
-  return(number_negdHess)
-}
-
-# Extract gradients for each parameter #
-extract_grad <- function(x){
-  if(!is.character(x)){
-    grad <- as.data.frame(x$gradients)
-    return(grad)
-  }
-}
-
-# Clean up gradients into dataframe #
-clean_grad <- function(grad, fits){
-  if(!is.null(grad)){
-    grad <- bind_cols(grad)
-  }
-  grad <- as.data.frame(t(grad))
-  names <- names(fits[[14]]$sd_report$par.fixed)
-  colnames(grad) <- pars_names
-  grad$sim <- 1:nrow(grad)
-  grad <- pivot_longer(grad,cols=1:11, names_to="term", values_to="gradient")
-  grad$big_grad <- ifelse(grad$gradient<0.001, 1,0)
-  large_grad <- aggregate(big_grad ~ term, grad, FUN=sum)
-  #large_grad$proportion <- large_grad$big_grad/length(fits)
-  return(large_grad)
-}
+#Create dataframe for plotting
+Eo_values <- as.data.frame(matrix(nrow=4))
+Eo_values$V1 <- NULL
+Eo_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
+Eo_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
+Eo_values$model <- model_names
+MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-Eo"), FUN=mean)
+Eo_values$MLE_avg <- MLE_avg$estimate
+Eo_values$true <- c(Eo, Eo, Eo2, Eo2)
 
 ## Apply to model fits ##
 ## Parameter estimates ##
@@ -341,137 +266,20 @@ pars4 <- clean_pars(pars4, fits=fits4)
 
 #Add column to label model
 pars1$model <- model_names[1]
+pars1$data <- "Typical Case"
+pars1$analysis <- "Unconstrained"
 pars2$model <- model_names[2]
+pars2$data <- "Typical Case"
+pars2$analysis <- "Prior Constrained"
 pars3$model <- model_names[3]
+pars3$data <- "Unusual Case"
+pars3$analysis <- "Unconstrained"
 pars4$model <- model_names[4]
-
-#plot a single model
-ggplot(pars1, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars2, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars3, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars4, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+pars4$data <- "Unusual Case"
+pars4$analysis <- "Prior Constrained"
 
 #Merge into one and combine
 pars <- rbind(pars1,pars2, pars3, pars4)
-ggplot(pars, aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
-facet_wrap("term", scales="free")+  
-  geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-
-#Just Eo 
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  geom_hline(data = subset(true_pars, true_pars$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-#Eo and logistic parameters
-ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  facet_wrap("term", scales="free")+  
-  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-
-#Restrict smax
-pars$estimate2 <- ifelse(pars$estimate>1000 & pars$term=="mi-smax", 1000, pars$estimate)
-
-#Eo and smax
-ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate2, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  facet_wrap("term", scales="free")+  
-  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-
-## Convergence/fitting errors ##
-convergence1 <- lapply(fits, extract_convergence)
-convergence1 <- bind_rows(convergence1)
-convergence2 <- lapply(fits2, extract_convergence)
-convergence2 <- bind_rows(convergence2)
-convergence3 <- lapply(fits3, extract_convergence)
-convergence3 <- bind_rows(convergence2)
-convergence4 <- lapply(fits4, extract_convergence)
-convergence4 <- bind_rows(convergence2)
-
-# Add column for data simulation and model
-convergence1$sim <- 1:100
-convergence1$model <- model_names[1]
-convergence2$sim <- 1:100
-convergence2$model <- model_names[2]
-convergence3$sim <- 1:100
-convergence3$model <- model_names[3]
-convergence4$sim <- 1:100
-convergence4$model <- model_names[4]
-
-#Bind all together
-convergence <-bind_rows(convergence1, convergence2,convergence3, convergence4)
-#Truncate message
-convergence$message <- substr(convergence$message, 1, 100)
-##Summarize number of each type of convergence for each model
-cons <- convergence %>% group_by(message, model) %>% summarise(count=n()) 
-##Flip to wide
-cons <-pivot_wider(cons, names_from=model, values_from=count)
-colnames(cons)[1] <- "metric"
-
-## Hessian matrix ##
-pdHess1 <- lapply(fits, extract_pdHess)
-pdHess <-bind_rows(pdHess1)
-hess<- extract_pdHess2(pdHess)
-
-pdHess2 <- lapply(fits2, extract_pdHess)
-pdHess2 <-bind_rows(pdHess2)
-hess2<- extract_pdHess2(pdHess2)
-
-pdHess3 <- lapply(fits3, extract_pdHess)
-pdHess3 <-bind_rows(pdHess3)
-hess3<- extract_pdHess2(pdHess3)
-
-pdHess4 <- lapply(fits4, extract_pdHess)
-pdHess4 <-bind_rows(pdHess4)
-hess4<- extract_pdHess2(pdHess4)
-
-hess <- as.data.frame(matrix(nrow=1, ncol=3))
-colnames(hess) <- model_names
-hess[1,1] <- "Positive definite hessian matrix"
-hess[1,2] <- extract_pdHess2(pdHess1)
-hess[1,3] <- extract_pdHess2(pdHess2)
-hess[1,4] <- extract_pdHess2(pdHess3)
-hess[1,5] <- extract_pdHess2(pdHess4)
-# Add to convergence table #
-diagnostics <- rbind(cons,setNames(hess, names(cons)))
-
-## Gradients ##
-
-# Apply to all models #
-grad1<- lapply(fits, extract_grad)
-grad2<- lapply(fits2, extract_grad)
-grad3<- lapply(fits3, extract_grad)
-grad4<- lapply(fits4, extract_grad)
-
-grads1<- clean_grad(grad1, fits)
-grads2<- clean_grad(grad2, fits2)
-grads3<- clean_grad(grad3, fits3)
-grads4<- clean_grad(grad4, fits4)
-
-# Bind together #
-grads1$model2 <-grads2$big_grad
-grads1$model3 <-grads3$big_grad
-grads1$model4 <-grads4$big_grad
-colnames(grads1) <-c("metric", model_names[1], model_names[2], model_names[3], model_names[4])
-grads1$metric <- paste0("Low gradient ", grads1$metric)
-
-## NA in SD ##
-pars$NAs <- ifelse(pars$std.error=="NaN"|is.na(pars$std.error), 0,1)
-NAs <- aggregate(pars$NAs~pars$term+pars$model, FUN=sum)
-colnames(NAs) <- c("metric", "model", "value")
-NAs$metric <- paste0("SE estimated", NAs$metric)
-# Flip to wide #
-NAs <-pivot_wider(NAs, names_from=model, values_from=value)
-
-## Combine into table summarizing all diagnostics ##
-diagnostics <- bind_rows(diagnostics, grads1, NAs)
 
 ### Parameter performance measures ###
 ## Average ##
@@ -481,7 +289,7 @@ sd_avg <- aggregate(estimate ~ term+model, pars, FUN=stats::sd)
 
 ## Root mean square error (accuracy) ##
 # Calculate error #
-pars$error <- case_when(pars$term=="mi-s50"~pars$estimate-x50,
+pars$error <- case_when(pars$term=="mi-s50"~pars$estimate-s50,
                         pars$term=="mi-delta"~pars$estimate-delta,
                         pars$term=="mi-smax"~pars$estimate-smax,
                         pars$term=="mi-Eo"& pars$model=="Typical Case, Unconstrained"~pars$estimate-Eo,
@@ -508,17 +316,74 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 
-#Plot RMSE
-ggplot(rmse, aes(x=model, y=rmse))+geom_point(aes(group=model, color=model))
-
-# Average standard error (precision)--also to compare to SD of prior #
-std_error_within_model <- aggregate(std.error ~ term+model, pars, FUN=mean) 
-
 ## Make a table ##
 rmse$"average" <- avg$estimate
-rmse$sd <- sd_avg$estimate
-rmse <- left_join(rmse, std_error_within_model)
-colnames(rmse) <- c("Parameter", "Model", "RMSE of inter-iteration average", "Inter-iteration average", "Inter-iteration SD of average estimate", "Average intra-iteration SE")
+par_performance <- rmse
+par_performance$sd <- sd_avg$estimate
+colnames(par_performance) <- c("Parameter", "Model", "RMSE", "Average", "Precision")
+
+par_performance$Bias <- case_when(par_performance$Parameter=="mi-s50"~par_performance$Average-s50,
+                        par_performance$Parameter=="mi-delta"~par_performance$Average-delta,
+                        par_performance$Parameter=="mi-smax"~par_performance$Average-smax,
+                        par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Unconstrained"~par_performance$Average-Eo,
+                        par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Prior Constrained"~par_performance$Average-Eo,
+                        par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Unconstrained"~par_performance$Average-Eo2,
+                        par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Prior Constrained"~par_performance$Average-Eo2,
+                        par_performance$Parameter=="log_depth_scaled"~par_performance$Average-beta1,
+                        par_performance$Parameter=="log_depth_scaled2"~par_performance$Average-beta2,
+                        par_performance$Parameter=="range"~par_performance$Average-range,
+                        par_performance$Parameter=="sigma_O"~par_performance$Average-sigma_O,
+                        par_performance$Parameter=="phi"~par_performance$Average-phi,
+                        par_performance$Parameter=="tweedie_p"~par_performance$Average-p,
+                        par_performance$Parameter=="as.factor(year)2010"~par_performance$Average-b_years[1],
+                        par_performance$Parameter=="as.factor(year)2011"~par_performance$Average-b_years[2],
+                        par_performance$Parameter=="as.factor(year)2012"~par_performance$Average-b_years[3],
+                        par_performance$Parameter=="as.factor(year)2013"~par_performance$Average-b_years[4],
+                        par_performance$Parameter=="as.factor(year)2014"~par_performance$Average-b_years[5],
+                        par_performance$Parameter=="as.factor(year)2015"~par_performance$Average-b_years[6])
+
+Eo_performance <- subset(par_performance, Parameter=="mi-Eo")
+
+### Plot parameter estimates ###
+#plot a single model
+ggplot(pars1, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars2, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars3, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars4, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+
+#Plot all
+ggplot(pars, aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
+
+#Density plot just Eo #
+ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate))+geom_density(fill="lightblue")+
+  geom_vline(data = Eo_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
+  geom_vline(data = Eo_values, aes(xintercept = true),linetype="dashed", size=1.2)+
+  facet_grid(analysis~data)+
+  xlab("Eo estimate")
+
+#Eo and logistic parameters
+ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
+
+#Restrict smax
+pars$estimate2 <- ifelse(pars$estimate>1000 & pars$term=="mi-smax", 1000, pars$estimate)
+
+#Eo and smax
+ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate2, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
 
 ## Other Options ##
 
@@ -541,14 +406,14 @@ colnames(rmse) <- c("Parameter", "Model", "RMSE of inter-iteration average", "In
 n <-100 #Number of simulations
 simdat_cv <- map(seq_len(n), ~simulate_fish(dat = dat,
                                          mesh = mesh,
-                                         x50 = x50,
+                                         s50 = s50,
                                          delta = delta,
                                          smax = smax,
                                          Eo = Eo))
 
 simdat2_cv <- map(seq_len(n), ~simulate_fish(dat = dat,
                                           mesh = mesh,
-                                          x50 = x50,
+                                          s50 = s50,
                                           delta = delta,
                                           smax = smax,
                                           Eo = Eo2))
@@ -610,10 +475,10 @@ nll_sum3 <- mapply(FUN=sum_nll, nll3, "nll", SIMPLIFY=F)
 nll_sum4 <- mapply(FUN=sum_nll, nll4, "nll", SIMPLIFY=F)
 
 ## Below simulated true threshold (=s95) ##
-s95 <- x50+delta
+s95 <- s50+delta
 sum_nll_thresh <- function(nll, column_nll, mi){
   if(is.data.frame(nll)){
-    nll <- filter(nll, mi <x50) 
+    nll <- filter(nll, mi <s50) 
     nlls <- as.numeric(nll[ , column_nll])
     sum_nll <- sum(nlls)
   }
@@ -893,13 +758,13 @@ logfun_basic <- function(mi, smax, s50, delta){
   beta1 <- (a - b) / delta
   logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * mi)) -1))
 }
-smax_test$logmu1 <- logfun_basic(smax_test$po2_prime, smax=5, s50=x50, delta)
-smax_test$logmu2 <- logfun_basic(smax_test$po2_prime, smax=20, s50=x50, delta)
-smax_test$logmu3 <- logfun_basic(smax_test$po2_prime, smax=50, s50=x50, delta)
-smax_test$logmu4 <- logfun_basic(smax_test$po2_prime, smax=100, s50=x50, delta)
-smax_test$logmu5 <- logfun_basic(smax_test$po2_prime, smax=500, s50=x50, delta)
-smax_test$logmu6 <- logfun_basic(smax_test$po2_prime, smax=1000, s50=x50, delta)
-smax_test$logmu7 <- logfun_basic(smax_test$po2_prime, smax=10000, s50=x50, delta)
+smax_test$logmu1 <- logfun_basic(smax_test$po2_prime, smax=5, s50=s50, delta)
+smax_test$logmu2 <- logfun_basic(smax_test$po2_prime, smax=20, s50=s50, delta)
+smax_test$logmu3 <- logfun_basic(smax_test$po2_prime, smax=50, s50=s50, delta)
+smax_test$logmu4 <- logfun_basic(smax_test$po2_prime, smax=100, s50=s50, delta)
+smax_test$logmu5 <- logfun_basic(smax_test$po2_prime, smax=500, s50=s50, delta)
+smax_test$logmu6 <- logfun_basic(smax_test$po2_prime, smax=1000, s50=s50, delta)
+smax_test$logmu7 <- logfun_basic(smax_test$po2_prime, smax=10000, s50=s50, delta)
 
 smax_test <- pivot_longer(smax_test, 2:8)
 
@@ -909,3 +774,145 @@ ggplot(smax_test, aes(x=po2_prime, y=value))+geom_point(aes(group=name, color=na
   ylab("pO2' effect")+
   scale_colour_discrete(type="viridis", "smax value", labels=c("5", "20", "50", "100", "500", "1000", "10000"))+theme(legend.position=c(0.8,0.2))
 
+
+
+### Extra stuff ###
+##Correlation of Eo and number of zero observations in dataset #
+# Make wide #
+pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
+# Plots #
+ggplot(pars_wide, aes(y=pars_wide$"mi-smax", x=pars_wide$"mi-Eo"))+geom_point()+
+  facet_wrap("model", scales="free")+
+  geom_vline(data = subset(true_pars, true_pars$term=="mi-Eo"), aes(xintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars,  true_pars$term=='mi-smax'), aes(yintercept = estimate),linetype="dashed", size=1.2)
+
+ggplot(pars_wide, aes(y=pars_wide$"mi-s50", x=pars_wide$"mi-Eo"))+geom_point()+
+  facet_wrap("model", scales="free")+
+  geom_vline(data = subset(true_pars, true_pars$term=="mi-Eo"), aes(xintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars,  true_pars$term=='mi-s50'), aes(yintercept = estimate),linetype="dashed", size=1.2)
+
+ggplot(pars_wide, aes(y=pars_wide$"mi-delta", x=pars_wide$"mi-Eo"))+geom_point()+
+  facet_wrap("model", scales="free")+
+  geom_vline(data = subset(true_pars, true_pars$term=="mi-Eo"), aes(xintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars,  true_pars$term=='mi-delta'), aes(yintercept = estimate),linetype="dashed", size=1.2)
+
+ggplot(pars_wide, aes(y=pars_wide$"log_depth_scaled2", x=pars_wide$"mi-Eo"))+geom_point()+
+  facet_wrap("model", scales="free")
+
+## Number of zero observations below threshold for each data simulation ##
+count_below_zero <- function(dat, threshold) {
+ count <- subset(dat, dat$sim==0 & dat$mi_weird < threshold)
+ count <- nrow(count)
+ return(count)
+}
+
+counts_below_zero <- lapply(simdat, count_below_zero,threshold=(s50+delta))
+counts_below_zero <- as.data.frame(unlist(counts_below_zero))
+counts_below_zero$id <- as.character(1:100)
+counts_below_zero2 <- lapply(simdat2, count_below_zero,threshold=(s50+delta))
+counts_below_zero2 <- as.data.frame(unlist(counts_below_zero2))
+counts_below_zero2$id <- as.character(1:100)
+
+# Add to pars_wide #
+pars_wide1 <- subset(pars_wide, model=='Unusual Case, Unconstrained')
+pars_wide1 <- left_join(pars_wide1, counts_below_zero2, by="id")
+
+ggplot(pars_wide1, aes(y=pars_wide1$"unlist(counts_below_zero2)", x=pars_wide1$"mi-Eo"))+geom_point()+
+  facet_wrap("model", scales="free")
+
+
+
+#### Simulation diagnostics ####
+## Convergence/fitting errors ##
+convergence1 <- lapply(fits, extract_convergence)
+convergence1 <- bind_rows(convergence1)
+convergence2 <- lapply(fits2, extract_convergence)
+convergence2 <- bind_rows(convergence2)
+convergence3 <- lapply(fits3, extract_convergence)
+convergence3 <- bind_rows(convergence2)
+convergence4 <- lapply(fits4, extract_convergence)
+convergence4 <- bind_rows(convergence2)
+
+# Add column for data simulation and model
+convergence1$sim <- 1:100
+convergence1$model <- model_names[1]
+convergence2$sim <- 1:100
+convergence2$model <- model_names[2]
+convergence3$sim <- 1:100
+convergence3$model <- model_names[3]
+convergence4$sim <- 1:100
+convergence4$model <- model_names[4]
+
+#Bind all together
+convergence <-bind_rows(convergence1, convergence2,convergence3, convergence4)
+#Truncate message
+convergence$message <- substr(convergence$message, 1, 100)
+##Summarize number of each type of convergence for each model
+cons <- convergence %>% group_by(message, model) %>% summarise(count=n()) 
+##Flip to wide
+cons <-pivot_wider(cons, names_from=model, values_from=count)
+colnames(cons)[1] <- "metric"
+
+## Hessian matrix ##
+pdHess1 <- lapply(fits, extract_pdHess)
+pdHess <-bind_rows(pdHess1)
+hess<- extract_pdHess2(pdHess)
+
+pdHess2 <- lapply(fits2, extract_pdHess)
+pdHess2 <-bind_rows(pdHess2)
+hess2<- extract_pdHess2(pdHess2)
+
+pdHess3 <- lapply(fits3, extract_pdHess)
+pdHess3 <-bind_rows(pdHess3)
+hess3<- extract_pdHess2(pdHess3)
+
+pdHess4 <- lapply(fits4, extract_pdHess)
+pdHess4 <-bind_rows(pdHess4)
+hess4<- extract_pdHess2(pdHess4)
+
+hess <- as.data.frame(matrix(nrow=1, ncol=3))
+colnames(hess) <- model_names
+hess[1,1] <- "Positive definite hessian matrix"
+hess[1,2] <- extract_pdHess2(pdHess1)
+hess[1,3] <- extract_pdHess2(pdHess2)
+hess[1,4] <- extract_pdHess2(pdHess3)
+hess[1,5] <- extract_pdHess2(pdHess4)
+# Add to convergence table #
+diagnostics <- rbind(cons,setNames(hess, names(cons)))
+
+## Gradients ##
+
+# Apply to all models #
+grad1<- lapply(fits, extract_grad)
+grad2<- lapply(fits2, extract_grad)
+grad3<- lapply(fits3, extract_grad)
+grad4<- lapply(fits4, extract_grad)
+
+grads1<- clean_grad(grad1, fits)
+grads2<- clean_grad(grad2, fits2)
+grads3<- clean_grad(grad3, fits3)
+grads4<- clean_grad(grad4, fits4)
+
+# Bind together #
+grads1$model2 <-grads2$big_grad
+grads1$model3 <-grads3$big_grad
+grads1$model4 <-grads4$big_grad
+colnames(grads1) <-c("metric", model_names[1], model_names[2], model_names[3], model_names[4])
+grads1$metric <- paste0("Low gradient ", grads1$metric)
+
+## NA in SD ##
+pars$NAs <- ifelse(pars$std.error=="NaN"|is.na(pars$std.error), 0,1)
+NAs <- aggregate(pars$NAs~pars$term+pars$model, FUN=sum)
+colnames(NAs) <- c("metric", "model", "value")
+NAs$metric <- paste0("SE estimated", NAs$metric)
+# Flip to wide #
+NAs <-pivot_wider(NAs, names_from=model, values_from=value)
+
+## Combine into table summarizing all diagnostics ##
+diagnostics <- bind_rows(diagnostics, grads1, NAs)
+
+#Plot RMSE
+#ggplot(rmse, aes(x=model, y=rmse))+geom_point(aes(group=model, color=model))
+
+# Average standard error (precision)--also to compare to SD of prior #
+#std_error_within_model <- aggregate(std.error ~ term+model, pars, FUN=mean) 

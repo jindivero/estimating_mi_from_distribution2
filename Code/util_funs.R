@@ -469,5 +469,90 @@ get_inits <- function() {
   return(init_vals)
 }
   
+## Functions for extracting parameter estimates and diagnostics ##
+# Extract parameter estimates #
+extract_pars <- function(x){
+  if(!is.character(x)){
+    par_estimates <- as.data.frame(tidy(x, conf.int = TRUE, effects="fixed"))
+    par_estimates_rand <- as.data.frame(tidy(x, conf.int = TRUE, effects="ran_pars"))
+    par_estimates <- bind_rows(par_estimates, par_estimates_rand)
+    return(par_estimates)
+  }
+  if(is.character(x)){
+    return(NA)
+  }
+}
 
+# Function to clean up pars for plotting #
+clean_pars <- function(pars, fits){
+  names(pars) <- c(1:length(fits))
+  #Remove models with errors
+  pars <- keep(pars, function(x) !is.logical(x))
+  #Combine into single dataframe, with column of simulation number
+  pars <- bind_rows(pars,.id="id")
+  return(pars)
+}
+
+# Aggregate errors #
+extract_convergence <- function(x){
+  if(!is.character(x)){
+    convergence <- as.data.frame(x[["model"]][["convergence"]])
+    colnames(convergence) <- "convergence"
+    convergence$iterations <- x$model$iterations
+    convergence$message <- x$model$message
+    convergence$evaluations_function <- x$model$evaluations[1]
+    convergence$evaluations_gradient <- x$model$evaluations[2]
+  }
+  if(is.character(x)){
+    convergence <- as.data.frame(matrix(ncol=5, nrow=1, NA))
+    colnames(convergence) <- c("convergence", "iterations", "message", "evaluations_function", "evaluations_gradient")
+    convergence[,3] <- paste(x[[1]])
+  }
+  cons <- bind_rows(convergence)
+  return(cons)
+}
+
+# Extract if positive definite hessian #
+
+# Extract hessian matrix T/F value #
+extract_pdHess <- function(x){
+  if(!is.character(x)){
+    pdh <- as.data.frame(x$pos_def_hessian)
+    return(pdh)
+  }
+}
+
+# Sum up across all iterations #
+extract_pdHess2 <- function(pdHess){
+  pdHess <- bind_rows(pdHess)
+  pdHess$sim <- as.numeric(row.names(pdHess))
+  pdHess$sim <- as.character(pdHess$sim)
+  pdHess$neg_def_hessian <- ifelse(pdHess$"x$pos_def_hessian"=="TRUE", 1,0)
+  number_negdHess <- print(sum(pdHess$neg_def_hessian))
+  return(number_negdHess)
+}
+
+# Extract gradients for each parameter #
+extract_grad <- function(x){
+  if(!is.character(x)){
+    grad <- as.data.frame(x$gradients)
+    return(grad)
+  }
+}
+
+# Clean up gradients into dataframe #
+clean_grad <- function(grad, fits){
+  if(!is.null(grad)){
+    grad <- bind_cols(grad)
+  }
+  grad <- as.data.frame(t(grad))
+  names <- names(fits[[14]]$sd_report$par.fixed)
+  colnames(grad) <- pars_names
+  grad$sim <- 1:nrow(grad)
+  grad <- pivot_longer(grad,cols=1:11, names_to="term", values_to="gradient")
+  grad$big_grad <- ifelse(grad$gradient<0.001, 1,0)
+  large_grad <- aggregate(big_grad ~ term, grad, FUN=sum)
+  #large_grad$proportion <- large_grad$big_grad/length(fits)
+  return(large_grad)
+}
 
