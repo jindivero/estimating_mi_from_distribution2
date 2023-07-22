@@ -145,7 +145,7 @@ phi <- 5 #estimated at 16 in real sablefish data
 p <- 1.5 #same as sablefish
 range <- 20 #80 in sablefish; had been 0.3 in previous data simulation
 sigma_O <- 0.8 #1.81 in real sablefish; had been 0.5 in previous data simulation
->>>>>>> Stashed changes
+
 Eo <- 0.291
 
 ## Fit Model 1: No priors ##
@@ -161,17 +161,17 @@ start[4,1] <- Eo
 start2 <- matrix(0.08, ncol = 1, nrow = 4)
 #Slightly farther
 start3 <- matrix(0, ncol = 1, nrow = 4)
-<<<<<<< Updated upstream
+
 start3[1,1] <- x50*0.1
 start3[2,1] <- delta*0.1
 start3[3,1] <- beta3*0.1
 start3[4,1] <- Eo*0.1
-=======
+
 start3[1,1] <- x50*0.5
 start3[2,1] <- delta*0.5
 start3[3,1] <- beta3*0.5
 start3[4,1] <- Eo*0.5
->>>>>>> Stashed changes
+
 
 ##Function to run model and return list of model outputs
 run_sdmTMB <- function(x, start) {
@@ -183,15 +183,12 @@ run_sdmTMB <- function(x, start) {
                    family =tweedie(link="log"),
                    control = sdmTMBcontrol(
                      start = list(b_threshold = start),
-<<<<<<< Updated upstream
                      #lower = list(b_threshold = c(0, 0, 0, 0)), 
                      #upper = list(b_threshold = c(Inf, Inf, Inf, Inf)),
                      #priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3306), c(NA, NA, NA, 0.173))),
-=======
                      lower = list(b_threshold = c(-Inf, -Inf, 0.01, 0.01)), 
                      upper = list(b_threshold = c(Inf, Inf, 100, 1)),
                      priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3306), c(NA, NA, NA, 0.173))),
->>>>>>> Stashed changes
                      newton_loops = 2)))
   try(tidy(m2))
   try(return(m2))
@@ -199,11 +196,9 @@ run_sdmTMB <- function(x, start) {
 
 ## Fit model to all simulated datasets ##
 fits <- lapply(data_sims_usual, run_sdmTMB, 
-<<<<<<< Updated upstream
                start=start)
-=======
                start=start3)
->>>>>>> Stashed changes
+
 
 extract_pars <- function(x){
   if(!is.character(x)){
