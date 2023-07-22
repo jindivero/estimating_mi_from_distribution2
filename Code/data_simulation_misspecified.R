@@ -1,11 +1,8 @@
 #### Simulating data from sablefish trawl data, where depth is smoother ####
 
 ### Install Packages ###
-#install.packages("remotes")
 library(remotes)
-#install.packages("devtools")
 library(devtools)
-#install.packages("pkgbuild")
 library(pkgbuild)
 remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE,  ref="newlogistic")
 library(sdmTMB)
@@ -20,7 +17,6 @@ library(dplyr)
 library(tidyr)
 library(purrr)
 library(MASS)
-#install.packages("ggpubr")
 library(ggpubr)
 library(scales)
 library(visreg)

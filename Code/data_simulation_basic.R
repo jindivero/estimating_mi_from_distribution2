@@ -1,11 +1,20 @@
 #### Simulating data from sablefish trawl data ####
 
+# Specify Parameters ####
+s50 <- 2 # same as sablefish= 0.88; had been 2 in previous data simulation
+delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
+smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
+Eo <- 0.3
+Eo2 <- 0.4
+
+phi <- 5 #estimated at 16 in real sablefish data
+p <- 1.5 #same as sablefish
+range <- 90 #80 in sablefish; had been 0.3 in previous data simulation
+sigma_O <- 0.8 #1.81 in real sablefish; had been 0.5 in previous data simulation
+
 ### Install Packages ###
-install.packages("remotes")
 library(remotes)
-install.packages("devtools")
 library(devtools)
-install.packages("pkgbuild")
 library(pkgbuild)
 remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE,  ref="newlogistic")
 library(sdmTMB)
@@ -20,7 +29,6 @@ library(dplyr)
 library(tidyr)
 library(purrr)
 library(MASS)
-install.packages("ggpubr")
 library(ggpubr)
 library(scales)
 library(visreg)
@@ -99,10 +107,7 @@ simulate_fish<- function(dat,mesh, x50, delta, smax, Eo) {
   return(dat)
 }
 
-x50 <- 2 # same as sablefish= 0.88; had been 2 in previous data simulation
-delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
-smax <- 50 # maximum effect of MI; had been 4 in previous data simulation
-Eo <- 0.291
+
 
 simdat <- simulate_fish(dat = dat,
                         mesh = mesh,
@@ -112,9 +117,20 @@ simdat <- simulate_fish(dat = dat,
                         Eo = Eo)
 
 ##Run data simulations
-#n <-10 #Number of simulations
-#data_sims_usual <- map(seq_len(n), ~simulate_fish(dat, 0.291)) 
-#data_sims_weird <- map(seq_len(n), ~simulate_fish(dat, 0.733)) 
+n <-25 #Number of simulations
+data_sims_usual <- map(seq_len(n), ~simulate_fish(dat = dat,
+                                                            mesh = mesh,
+                                                            x50 = s50,
+                                                            delta = delta,
+                                                            smax = smax,
+                                                            Eo = Eo))
+
+data_sims_unusual <- map(seq_len(n), ~simulate_fish(dat = dat,
+                                                  mesh = mesh,
+                                                  x50 = s50,
+                                                  delta = delta,
+                                                  smax = smax,
+                                                  Eo = Eo2))
 
 ##Sanity checks on simulated data
 ## Compare one to the real sablefish data ##
@@ -127,71 +143,66 @@ simdat <- simulate_fish(dat = dat,
 # 
 ## Specify all parameters from data generation for reference ##
 ## Simulation parameters ##
-# x50 <- 2 # same as sablefish; had been 2 in previous data simulation
-# delta <- 2 #same as sablefish; had been 2 in previous data simulation
-# b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68) #basically same as real sablefish
-# beta1 <- 1.5 #depth #same as sablefish
-# beta2 <- -1 #depth^2 #same as sablefish
-# smax <- 50 # maximum effect of MI; had been 4 in previous data simulation
-# phi <- 5 #estimated at 16 in real sablefish data
-# p <- 1.5 #same as sablefish
-# range <- 90 #80 in sablefish; had been 0.3 in previous data simulation
-# sigma_O <- 0.8 #1.81 in real sablefish; had been 0.5 in previous data simulation
 #Eo <- 0.291
 
 ## Fit Model 1: No priors ##
 ##Set starting parameters
 #Correct values
 
-start <- matrix(0, ncol = 1, nrow = 4)
-start[1,1] <- x50
-start[2,1] <- delta
-start[3,1] <- smax
-start[4,1] <- Eo
-
-m2 <- sdmTMB(sim ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
-             data = simdat, 
-             spatial = "on",
-             spatiotemporal="off",
-             mesh=mesh,
-             family =tweedie(link="log"),
-             control = sdmTMBcontrol(
-               start = list(b_threshold = start),
-    #           lower = list(b_threshold = c(-Inf, -Inf, 0.01, 0.01)), 
-     #          upper = list(b_threshold = c(Inf, Inf, 100, 1)),
-               newton_loops = 2)
-             )
-summary(m2)
-
-# with priors
-
-prior <- normal(c(NA, NA, NA, 0.331), c(NA, NA, NA, 0.176))
-
-start[1,1] <- x50 
-start[2,1] <- delta 
-start[3,1] <- smax
-start[4,1] <- Eo 
 
 
-m2a <- sdmTMB(sim ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
-              data = simdat, 
-              time = NULL,
-              reml = F,
-              anisotropy = TRUE,
-              spatiotemporal = FALSE,
-              mesh=mesh,
-              family =tweedie(link="log"),
-              priors=sdmTMBpriors(threshold = prior),
-              control = sdmTMBcontrol(
-                start = list(b_threshold = start),
-      #          upper = list(b_threshold = upper),
-      #          lower = list(b_threshold = lower),
-                newton_loops = 3))
+start1 <- matrix(0, ncol = 1, nrow = 4)
+start1[1,1] <- x50
+start1[2,1] <- delta
+start1[3,1] <- smax
+start1[4,1] <- Eo
+start2 <- start1
+start2[4,1] <- Eo2
 
-summary(m2a)
+##Function to run model and return list of model outputs
+run_sdmTMB_1 <- function(simdat, start, mesh) {
+  m2 <- try(sdmTMB(sim ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+                   data = simdat, 
+                   spatial = "on",
+                   spatiotemporal="off",
+                   mesh=mesh,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     start = list(b_threshold = start),
+                     #lower = list(b_threshold = c(-Inf, -Inf, -Inf, -Inf)), 
+                     # upper = list(b_threshold = c(Inf, Inf, 100, Inf)),
+                     newton_loops = 2)))
+  try(tidy(m2))
+  try(return(m2))
+}
 
+## Function to run model 2 (with prior) ##
+run_sdmTMB_2 <- function(simdat, start, mesh) {
+  m2 <- try(sdmTMB(sim ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+                   data = simdat, 
+                   spatial = "on",
+                   spatiotemporal="off",
+                   mesh=mesh,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     start = list(b_threshold = start),
+                     newton_loops = 2),
+                   priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
+  
+  try(tidy(m2))
+  try(return(m2))
+}
 
+## Fit model to all simulated datasets ##
+fits <- lapply(data_sims_usual, run_sdmTMB_1, 
+               start=start1, mesh=mesh)
+fits2 <- lapply(data_sims_usual, run_sdmTMB_2, 
+                start=start1, mesh=mesh)
 
+fits3 <- lapply(data_sims_unusual, run_sdmTMB_1, 
+                start=start2, mesh=mesh)
+fits4 <- lapply(data_sims_unusual, run_sdmTMB_2, 
+                start=start2, mesh=mesh)
 
 
 ##Aggregate errors

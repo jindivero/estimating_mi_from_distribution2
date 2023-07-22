@@ -1,11 +1,29 @@
 #### Simulating data from sablefish trawl data ####
 
+##Set parameter values for data generation and model fitting ####
+s50 <-2 # same as sablefish= 0.88; had been 2 in previous data simulation
+delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
+smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
+Eo <- 0.3
+Eo2 <- 0.7
+
+b_years <- rnorm(n = 6, mean = 4, sd = 1)
+beta1 <- 1.5
+beta2 <- -1
+phi <- 10 # 16 corresponds to sablefish 
+p <- 1.51
+range <- 85
+sigma_O <- 1.77
+
+## How many data sets to produce
+n <- 100
+
 ### Install Packages ###
-install.packages("remotes")
+#install.packages("remotes")
 library(remotes)
-install.packages("devtools")
+#install.packages("devtools")
 library(devtools)
-install.packages("pkgbuild")
+#install.packages("pkgbuild")
 library(pkgbuild)
 remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE,  ref="newlogistic")
 library(sdmTMB)
@@ -20,16 +38,16 @@ library(dplyr)
 library(tidyr)
 library(purrr)
 library(MASS)
-install.packages("ggpubr")
+#install.packages("ggpubr")
 library(ggpubr)
 library(scales)
 library(visreg)
 library(ggeffects)
 library(stringr)
 library(TMB)
-install.packages("tweedie")
+#install.packages("tweedie")
 library(tweedie)
-install.packages("ggridges")
+#install.packages("ggridges")
 library(ggridges)
 library(viridis)
 
@@ -39,7 +57,7 @@ theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blan
 
 ### load helper functions ####
 source("Code/util_funs.R")
-
+source("Code/sim_funs.R")
 ### Load Data ####
 
 sci_name <- "Anoplopoma fimbria" 
@@ -69,61 +87,37 @@ dat$Y <- dat$latitude
 dat$cpue_kg_km2 <- dat$cpue_kg_km2 * (dat$p2+dat$p3)
 dat$year <- as.factor(dat$year)
 
-### Fish density distribution simulation ###
+### Fish density distribution simulation ####
 ## Simulation parameters ##
-
+model.pars <- list(b_years = b_years,
+                   beta1 = beta1,
+                   beta2 = beta2,
+                   phi = phi,
+                   p = p,
+                   range = range,
+                   sigma_O=sigma_O)
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
-simulate_fish<- function(dat,mesh, s50, delta, smax, Eo) {
-  # s50 <- 2 # same as sablefish= 0.88; had been 2 in previous data simulation
-  #  delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
-  b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68) #basically same as real sablefish
-  beta1 <- 1.5 #depth #same as sablefish
-  beta2 <- -1 #depth^2 #same as sablefish
-  #  smax <- 50 # maximum effect of MI; had been 4 in previous data simulation
-  phi <- 16 #estimated at 16 in real sablefish data
-  p <- 1.51 #same as sablefish
-  range <- 85 #80 in sablefish; had been 0.3 in previous data simulation
-  sigma_O <- 1.77 #1.81 in real sablefish; had been 0.5 in previous data simulation
-  seed <- sample(1:1000, 1)
-  sim <- sdmTMB_simulate(formula=~-1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2,
-                         data=dat,
-                         family=tweedie(link="log"),
-                         tweedie_p=p,
-                         phi=phi,
-                         range=range,
-                         sigma_O=sigma_O,
-                         sigma_E=NULL,
-                         mesh=mesh,
-                         threshold_coefs=c(s50, delta, smax, Eo),
-                         B=c(b_years, beta1, beta2),
-                         seed=seed)
-  dat$sim <- sim$observed
-  return(dat)
-}
 
-##Set parameter values for data generation and model fitting
-s50 <-1 # same as sablefish= 0.88
-delta <- 0.5 #same as sablefish = 0.57
-smax <- 50 # maximum effect of MI
-Eo <- 0.3
-Eo2 <- 0.7
 
-#Set number of iterations
-n <-100 #Number of simulations
+
+### Simulate data under typical Eo ####
+
 simdat <- map(seq_len(n), ~simulate_fish(dat = dat,
                         mesh = mesh,
                         s50 = s50,
                         delta = delta,
                         smax = smax,
-                        Eo = Eo))
-
+                        Eo = Eo,
+                        modelpars = model.pars))
+### Simulate data undate atypical Eo
 simdat2 <- map(seq_len(n), ~simulate_fish(dat = dat,
                             mesh = mesh,
                             s50 = s50,
                             delta = delta,
                             smax = smax,
-                            Eo = Eo2))
+                            Eo = Eo2,
+                            modelpars = model.pars))
 
 ###Sanity checks on simulated data
 
@@ -134,8 +128,6 @@ sim_test <- simdat[[1]]
 sim_test2 <- simdat2[[1]]
 
 ggplot(dat, aes(x=po2_s,y=cpue_kg_km2))+geom_point(size=0.6)+geom_point(sim_test, mapping=aes(x=po2_s, y=sim), color="blue", size=0.6)
-ggplot(sim_test, aes(x=po2,y=observed))+geom_point()
-ggplot(sim_test2, aes(x=po2,y=observed))+geom_point()
 }
 
 #Save simulated data
@@ -145,6 +137,7 @@ saveRDS(data_sims_usual, "data_sims_usual.rds")
 saveRDS(data_sims_weird, "data_sims_weird.rds")
 }
 
+
 ## Fit Model 1: No priors ##
 ##Set starting parameters
 #Correct values
@@ -153,6 +146,9 @@ start[1,1] <- s50
 start[2,1] <- delta
 start[3,1] <- smax
 start[4,1] <- Eo
+
+start_unusual <- start
+start_unusual[4,1] <- Eo2
 
 #Just above zero
 start2 <- matrix(0.08, ncol = 1, nrow = 4)
@@ -171,67 +167,23 @@ start4[2,1] <- delta
 start4[3,1] <- smax
 start4[4,1] <- Eo2
 
-##Function to run model and return list of model outputs
-run_sdmTMB_1 <- function(simdat, start, mesh) {
-  m2 <- try(sdmTMB(sim ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
-                   data = simdat, 
-                   spatial = "on",
-                   spatiotemporal="off",
-                   mesh=mesh,
-                   family =tweedie(link="log"),
-                   control = sdmTMBcontrol(
-                     start = list(b_threshold = start),
-                                #lower = list(b_threshold = c(-Inf, -Inf, -Inf, -Inf)), 
-                              # upper = list(b_threshold = c(Inf, Inf, 100, Inf)),
-                     newton_loops = 2)))
-  try(tidy(m2))
-  try(return(m2))
-}
-
-## Function to run model 2 (with prior) ##
-run_sdmTMB_2 <- function(simdat, start, mesh) {
-  m2 <- try(sdmTMB(sim ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
-                   data = simdat, 
-                   spatial = "on",
-                   spatiotemporal="off",
-                   mesh=mesh,
-                   family =tweedie(link="log"),
-                   control = sdmTMBcontrol(
-                     start = list(b_threshold = start),
-                     newton_loops = 2),
-                   priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
-                   
-  try(tidy(m2))
-  try(return(m2))
-}
 
 ## Fit model to all simulated datasets ##
-fits <- lapply(simdat, run_sdmTMB_1, 
+fits <- lapply(simdat, run_sdmTMB_noprior, 
                 start=start, mesh=mesh)
-fits2 <- lapply(simdat, run_sdmTMB_2, 
+fits2 <- lapply(simdat, run_sdmTMB_prior, 
                 start=start, mesh=mesh)
 
-fits3 <- lapply(simdat2, run_sdmTMB_1, 
-                start=start4, mesh=mesh)
-fits4 <- lapply(simdat2, run_sdmTMB_2, 
-                start=start4, mesh=mesh)
+fits3 <- lapply(simdat2, run_sdmTMB_noprior, 
+                start=start_unusual, mesh=mesh)
+fits4 <- lapply(simdat2, run_sdmTMB_prior, 
+                start=start_unusual, mesh=mesh)
 
 #Save models
-#save(fits, fits1, fits2, fits3, fits_b, fits_c, file="model_fits.Rdata")
 if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")
 }
 
-### Evaluate model performance ###
-## Set true pars vectors of values and name ##
-b_years <- c(4.47,4.53,4.44,4.43,4.68,4.68)
-beta1 <- 1.5
-beta2 <- -1
-smax <- 50
-phi <- 16 
-p <- 1.51
-range <- 85
-sigma_O <- 1.77
 # Make list of parameter names"
 pars_names <- c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015")
 true_pars <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), 
@@ -360,11 +312,13 @@ ggplot(pars, aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model)
   scale_x_discrete(labels=c("1", "2", "3", "4"))
 
 #Density plot just Eo #
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate))+geom_density(fill="lightblue")+
+ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
+  geom_density(fill="lightblue", adjust = 1.5) +
   geom_vline(data = Eo_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
   geom_vline(data = Eo_values, aes(xintercept = true),linetype="dashed", size=1.2)+
   facet_grid(analysis~data)+
-  xlab("Eo estimate")
+  xlab("Eo estimate") + 
+  theme(strip.text = element_text(size = 14))
 
 #Eo and logistic parameters
 ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
@@ -403,53 +357,32 @@ ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|
 
 #### Cross-validation with model predictions ####
 ### Simulate new cross-validation data ###
-n <-100 #Number of simulations
 simdat_cv <- map(seq_len(n), ~simulate_fish(dat = dat,
                                          mesh = mesh,
                                          s50 = s50,
                                          delta = delta,
                                          smax = smax,
-                                         Eo = Eo))
+                                         Eo = Eo,
+                                         modelpars = model.pars))
 
 simdat2_cv <- map(seq_len(n), ~simulate_fish(dat = dat,
                                           mesh = mesh,
                                           s50 = s50,
                                           delta = delta,
                                           smax = smax,
-                                          Eo = Eo2))
+                                          Eo = Eo2,
+                                          modelpars = model.pars))
 
 ### Predictions ###
 ## Function to predict from each model and each dataset ##
-predict_sims <- function(x, new_data, p, phi){
-  if(!is.character(x)){
-    preds <- predict(x, newdata=new_data, type="response", return_tmb_object=F)
-    #Add observation error from predictions with Tweedie parameters from model fi
-    preds$pred2 <- rTweedie(preds$est, p = p, phi = phi)
-  }
-  if(is.character(x)){
-    preds <- NA
-  }
-    return(preds)
-  }
- 
+
 ## Make predictions from existing model fits ##
 preds1<- mapply(FUN=predict_sims, fits, simdat_cv, p, phi, SIMPLIFY=F)
 preds2<- mapply(FUN=predict_sims, fits2, simdat_cv, p, phi, SIMPLIFY=F)
 preds3<- mapply(FUN=predict_sims, fits3, simdat2_cv, p, phi, SIMPLIFY=F)
 preds4<- mapply(FUN=predict_sims, fits4, simdat2_cv, p, phi, SIMPLIFY=F)
 
-### Negative log probability of observations given model fit ###
-calculate_nll <- function(data_observed, data_predicted, column_obs, column_preds, ps, phis){
-  if(is.data.frame(data_predicted)){
-  observed <- as.numeric(data_observed[ , column_obs])
-  predicted <- as.numeric(data_predicted[, column_preds])
-  nll <- dtweedie(y=observed, mu=predicted,power=p, phi=phi)
-  predicted2 <- cbind(data_predicted, nll)}
-  if(!is.data.frame(data_predicted)){
-    predicted2 <- NA
-  }
-  return(predicted2)
-  }
+
 
 ## Apply to each ##
 nll1 <- mapply(FUN=calculate_nll, simdat_cv, preds1, "sim", "est", p, phi, SIMPLIFY=F)
@@ -457,54 +390,19 @@ nll2 <- mapply(FUN=calculate_nll, simdat_cv, preds2, "sim", "est", p, phi, SIMPL
 nll3 <- mapply(FUN=calculate_nll, simdat2_cv, preds3, "sim", "est", p, phi, SIMPLIFY=F)
 nll4 <- mapply(FUN=calculate_nll, simdat2_cv, preds4, "sim", "est", p, phi, SIMPLIFY=F)
 
-# Sum overall #
-sum_nll <- function(nll, column_nll){
-  if(is.data.frame(nll)){
-  nlls <- as.numeric(nll[ , column_nll])
-  sum_nll <- sum(nlls)
-  }
-  if(!is.data.frame(nll)){
-    sum_nll <- NA
-  }
-  return(sum_nll)
-}
 
 nll_sum1 <- mapply(FUN=sum_nll, nll1, "nll", SIMPLIFY=F)
 nll_sum2 <- mapply(FUN=sum_nll, nll2, "nll", SIMPLIFY=F)
 nll_sum3 <- mapply(FUN=sum_nll, nll3, "nll", SIMPLIFY=F)
 nll_sum4 <- mapply(FUN=sum_nll, nll4, "nll", SIMPLIFY=F)
 
-## Below simulated true threshold (=s95) ##
-s95 <- s50+delta
-sum_nll_thresh <- function(nll, column_nll, mi){
-  if(is.data.frame(nll)){
-    nll <- filter(nll, mi <s50) 
-    nlls <- as.numeric(nll[ , column_nll])
-    sum_nll <- sum(nlls)
-  }
-  if(!is.data.frame(nll)){
-    sum_nll <- NA
-  }
-  return(sum_nll)
-}
 
 nll1_thresh <- mapply(FUN=sum_nll_thresh, nll1, "nll", "mi_usual", SIMPLIFY=F)
 nll2_thresh <- mapply(FUN=sum_nll_thresh, nll2, "nll", "mi_usual", SIMPLIFY=F)
 nll3_thresh <- mapply(FUN=sum_nll_thresh, nll3, "nll", "mi_weird", SIMPLIFY=F)
 nll4_thresh <- mapply(FUN=sum_nll_thresh, nll4, "nll", "mi_weird", SIMPLIFY=F)
 
-## Above simulated true threshold (=s95) ##
-sum_nll_above <- function(nll, column_nll, mi){
-  if(is.data.frame(nll)){
-    nll <- filter(nll, mi >s95) 
-    nlls <- as.numeric(nll[ , column_nll])
-    sum_nll <- sum(nlls)
-  }
-  if(!is.data.frame(nll)){
-    sum_nll <- NA
-  }
-  return(sum_nll)
-}
+
 nll1_above <- mapply(FUN=sum_nll_above, nll1, "nll", "mi_usual", SIMPLIFY=F)
 nll2_above <- mapply(FUN=sum_nll_above, nll2, "nll", "mi_usual", SIMPLIFY=F)
 nll3_above <- mapply(FUN=sum_nll_above, nll3, "nll", "mi_weird", SIMPLIFY=F)
@@ -574,20 +472,6 @@ start[1,1] <-  -1.1
 start[2,1] <- -1.1
 start[3,1] <- 15
 
-run_sdmTMB_3 <- function(simdat, start, mesh) {
-  m2 <- try(sdmTMB(sim ~ -1+as.factor(year)+logistic(po2_s)+log_depth_scaled+log_depth_scaled2, 
-                   data = simdat, 
-                   spatial = "on",
-                   spatiotemporal="off",
-                   mesh=mesh,
-                   family =tweedie(link="log"),
-                   control = sdmTMBcontrol(
-                     start = list(b_threshold = start),
-                     newton_loops = 2)))
-  
-  try(tidy(m2))
-  try(return(m2))
-}
 
 ## Fit model to all simulated datasets ##
 fits5 <- lapply(simdat, run_sdmTMB_3, 
@@ -701,39 +585,11 @@ ggplot(nll_combined, aes(y=Below_s50,x=Model, group=Model, fill = Model))+
   xlab("Model")+
   ylab("Log-Likelihood for Observations Below true s50 of pO2'")
 
-### Logistic shape comparison ###
-## Calculate po2_prime effect for each model ##
-# Function #
-calculate_po2_prime <- function(dat, model) {
-  if(!is.character(model)){
-  parfit <- model$sd_report
-  npars <- length(parfit$value)
-  parnames <- names(parfit$value)
 
-  Eo <- parfit$value[grep("Eo", parnames)]
-  dat$po2_prime <-  dat$po2 * exp(Eo * dat$invtemp)
-  dat$smax <- parfit$value[grep("s_max", parnames)]
-  }
-  if(is.character(model)){
-    dat <- NA
-}
-  return(dat)
-}
 # Apply #
 simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
 
 
-## Calculate po2 prime effect ##
-# Function #
-logfun_all <- function(dat, model) {
-  if(!is.character(model)){
-    dat$logfun <- exp(logfun(dat$po2_prime, model = model, mi = T))
-  }
-  if(is.character(model)){
-    dat <- NA
-  }
-  return(dat)
-}
 
 # Apply #
 simdats1 <- mapply(FUN=logfun_all, simdats1, fits)
@@ -751,13 +607,7 @@ ggplot(bind_rows(simdats2, .id="df"), aes(po2_prime, logfun, colour=as.factor(sm
 # simulation version #
 smax_test <- as.data.frame(dat$mi_usual)
 colnames(smax_test) <- "po2_prime"
-logfun_basic <- function(mi, smax, s50, delta){
-  a <- log(smax / (log(0.5) + smax) - 1)
-  b <- log(smax / (log(0.95) + smax) - 1)
-  beta0 <- -a + s50 * (b - a) / delta
-  beta1 <- (a - b) / delta
-  logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * mi)) -1))
-}
+
 smax_test$logmu1 <- logfun_basic(smax_test$po2_prime, smax=5, s50=s50, delta)
 smax_test$logmu2 <- logfun_basic(smax_test$po2_prime, smax=20, s50=s50, delta)
 smax_test$logmu3 <- logfun_basic(smax_test$po2_prime, smax=50, s50=s50, delta)
@@ -799,12 +649,6 @@ ggplot(pars_wide, aes(y=pars_wide$"mi-delta", x=pars_wide$"mi-Eo"))+geom_point()
 ggplot(pars_wide, aes(y=pars_wide$"log_depth_scaled2", x=pars_wide$"mi-Eo"))+geom_point()+
   facet_wrap("model", scales="free")
 
-## Number of zero observations below threshold for each data simulation ##
-count_below_zero <- function(dat, threshold) {
- count <- subset(dat, dat$sim==0 & dat$mi_weird < threshold)
- count <- nrow(count)
- return(count)
-}
 
 counts_below_zero <- lapply(simdat, count_below_zero,threshold=(s50+delta))
 counts_below_zero <- as.data.frame(unlist(counts_below_zero))
