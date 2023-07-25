@@ -193,17 +193,6 @@ true_pars2 <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-del
 # Set model names #
 model_names <- c("Typical Case, Unconstrained", "Typical Case, Prior Constrained", "Unusual Case, Unconstrained", "Unusual Case, Prior Constrained")
 
-
-#Create dataframe for plotting
-Eo_values <- as.data.frame(matrix(nrow=4))
-Eo_values$V1 <- NULL
-Eo_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
-Eo_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
-Eo_values$model <- model_names
-MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-Eo"), FUN=mean)
-Eo_values$MLE_avg <- MLE_avg$estimate
-Eo_values$true <- c(Eo, Eo, Eo2, Eo2)
-
 ## Apply to model fits ##
 ## Parameter estimates ##
 pars1 <- lapply(fits, extract_pars)
@@ -236,6 +225,7 @@ pars <- rbind(pars1,pars2, pars3, pars4)
 ### Parameter performance measures ###
 ## Average ##
 avg <- aggregate(estimate ~ term+model, pars, FUN=mean)
+
 # Average standard
 sd_avg <- aggregate(estimate ~ term+model, pars, FUN=stats::sd)
 
@@ -268,6 +258,25 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 
+#Create dataframe for plotting
+Eo_values <- as.data.frame(matrix(nrow=4))
+Eo_values$V1 <- NULL
+Eo_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
+Eo_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
+Eo_values$model <- c("Typical Case, Prior Constrained", "Typical Case, Unconstrained","Unusual Case, Prior Constrained", "Unusual Case, Unconstrained")
+MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-Eo"), FUN=mean)
+Eo_values$MLE_avg <- MLE_avg$estimate
+Eo_values$true <- c(Eo, Eo, Eo2, Eo2)
+
+s50_values <- as.data.frame(matrix(nrow=4))
+s50_values$V1 <- NULL
+s50_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
+s50_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
+s50_values$model <- c("Typical Case, Prior Constrained", "Typical Case, Unconstrained","Unusual Case, Prior Constrained", "Unusual Case, Unconstrained")
+MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-s50"), FUN=mean)
+s50_values$MLE_avg <- MLE_avg$estimate
+s50_values$true <- c(s50, s50,s50,s50)
+
 ## Make a table ##
 rmse$"average" <- avg$estimate
 par_performance <- rmse
@@ -295,22 +304,9 @@ par_performance$Bias <- case_when(par_performance$Parameter=="mi-s50"~par_perfor
                         par_performance$Parameter=="as.factor(year)2015"~par_performance$Average-b_years[6])
 
 Eo_performance <- subset(par_performance, Parameter=="mi-Eo")
+s50_performance <- subset(par_performance, Parameter=="mi-s50")
 
 ### Plot parameter estimates ###
-#plot a single model
-ggplot(pars1, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars2, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars3, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-ggplot(pars4, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
-
-#Plot all
-ggplot(pars, aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  facet_wrap("term", scales="free")+  
-  geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-
 #Density plot just Eo #
 ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
@@ -320,40 +316,15 @@ ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   xlab("Eo estimate") + 
   theme(strip.text = element_text(size = 14))
 
-#Eo and logistic parameters
-ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  facet_wrap("term", scales="free")+  
-  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
+ # Density plot s50 #
+ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
+  geom_density(fill="lightblue", adjust = 1.5) +
+  geom_vline(data = s50_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
+  geom_vline(data = s50_values, aes(xintercept = true),linetype="dashed", size=1.2)+
+  facet_grid(analysis~data)+
+  xlab("s50 estimate") + 
+  theme(strip.text = element_text(size = 14))
 
-#Restrict smax
-pars$estimate2 <- ifelse(pars$estimate>1000 & pars$term=="mi-smax", 1000, pars$estimate)
-
-#Eo and smax
-ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate2, x=model))+geom_boxplot(aes(group=model, fill=model))+
-  facet_wrap("term", scales="free")+  
-  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
-  theme(legend.position="left")+
-  scale_x_discrete(labels=c("1", "2", "3", "4"))
-
-## Other Options ##
-
-# SD of average estimate (precision) #
-#sd_avg <- aggregate(estimate ~ term+model, pars, FUN=stats::sd)
-# Range of average estimates (precision) #
-#range_pars <- aggregate(estimate ~ term+model, pars, FUN=fivenum)
-# Range of standard error (precision) #
-#sd_range <- aggregate(std.error~ term+model, pars, FUN=fivenum)
-# Standard deviation of standard error #
-#sd_sd <- aggregate(std.error ~ term+model, pars, FUN=stats::sd)
-# Precision #
-# 95% range (upper 95% CI--lower 95% CI) #
-#pars$con.range <- pars$conf.high-pars$conf.low
-#Average 95% range
-#avg_conf.range <- aggregate(con.range ~ term+model, pars, FUN=mean)
 
 #### Cross-validation with model predictions ####
 ### Simulate new cross-validation data ###
@@ -450,21 +421,6 @@ colnames(nll_95)[2] <- "Above_s95"
 nll_combined <- cbind(nll_all,nll_95, nll_below)
 nll_combined <- nll_combined[, c(1,2,4,6)]
 
-# Plot #
-ggplot(nll_combined, aes(x=Above_s95, y=Below_s50))+
-  stat_density_2d(geom = "raster",aes(fill = after_stat(density)),contour = FALSE)+
-  scale_fill_viridis_c()+geom_point(color="white", size=3.5, shape="*")+
-  facet_grid("Model")+
-  xlab("Above s95")+
-  ylab("Below s50")
-
-ggplot(nll_combined, aes(x=Overall, y=Below_s50))+
-  stat_density_2d(geom = "raster",aes(fill = after_stat(density)),contour = FALSE)+
-  scale_fill_viridis_c()+geom_point(color="white", size=3.5, shape="*")+
-  facet_grid("Model")+
-  xlab("All Data")+
-  ylab("Below s50")
-
 ### Run logistic pO2 equations and run predictions ###
 ## Function to run model 2 (with prior) ##
 start <- matrix(0, ncol = 1, nrow = 3)
@@ -475,7 +431,7 @@ start[3,1] <- 15
 
 ## Fit model to all simulated datasets ##
 fits5 <- lapply(simdat, run_sdmTMB_3, 
-               start=start, mesh=mesh)
+                start=start, mesh=mesh)
 
 start <- matrix(0, ncol = 1, nrow = 3)
 start[1,1] <-  -1.1
@@ -493,29 +449,6 @@ nll5 <- mapply(FUN=calculate_nll, simdat_cv, preds5, "sim", "est", p, phi, SIMPL
 nll6 <- mapply(FUN=calculate_nll, simdat2_cv, preds6, "sim", "est", p, phi, SIMPLIFY=F)
 nll_sum5 <- mapply(FUN=sum_nll, nll5, "nll", SIMPLIFY=F)
 nll_sum6 <- mapply(FUN=sum_nll, nll6, "nll", SIMPLIFY=F)
-
-nll_log <- as.data.frame(unlist(nll_sum5))
-nll_log <- cbind(nll_log, unlist(nll_sum6))
-colnames(nll_log) <- c( "Typical Case, Logistic pO2", "Unusual Case, Logistic pO2")
-
-# Combine with other #
-nll_combined$logistic_typical <- nll_log[,1]
-nll_combined$logistic_unusual <- nll_log[,2]
-
-# Plot #
-ggplot(subset(nll_combined, Model=="Typical Case, Unconstrained"|Model=="Typical Case, Prior Constrained"), aes(x=logistic_typical, y=Overall))+
-  stat_density_2d(geom = "raster",aes(fill = after_stat(density)),contour = FALSE)+
-  scale_fill_viridis_c()+geom_point(color="white", size=3.5, shape="*")+
-  facet_grid("Model")+
-  xlab("Logistic Typical")+
-  ylab("pO2'")
-
-ggplot(subset(nll_combined, Model=="Unusual Case, Unconstrained"|Model=="Unusual Case, Prior Constrained"), aes(x=logistic_unusual, y=Overall))+
-  stat_density_2d(geom = "raster",aes(fill = after_stat(density)),contour = FALSE)+
-  scale_fill_viridis_c()+geom_point(color="white", size=3.5, shape="*")+
-  facet_grid("Model")+
-  xlab("Logistic Unusual")+
-  ylab("pO2'")
 
 # Subset logistic(po2) into thresholds #
 # Above s95 #
@@ -552,39 +485,32 @@ nll_log_combined <- nll_log_combined[,c(1,2,4,6)]
 
 nll_combined <- bind_rows(nll_combined, nll_log_combined)
 
-# Reorder factor # 
-nll_combined$Model <-factor(nll_combined$Model, levels=c("Typical Case, Unconstrained", "Unusual Case, Unconstrained","Typical Case, Prior Constrained", "Unusual Case, Prior Constrained","Typical Case, Logistic pO2","Unusual Case, Logistic pO2"))
-# Plot #
-ggplot(nll_combined, aes(x=Above_s95, y=Below_s50))+
-  stat_density_2d(geom = "raster",aes(fill = after_stat(density)),contour = FALSE)+
-  scale_fill_viridis_c()+geom_point(color="white", size=3.5, shape="*")+
-  facet_wrap("Model", ncol=2)+
-  xlab("Above s95")+
-  ylab("Below s50")
+#Average NLL for plotting
+LL_values <- as.data.frame(matrix(nrow=6))
+LL_values$V1 <- NULL
+LL_values$data <- c("Typical Case", "Typical Case", "Typical Case", "Unusual Case", "Unusual Case", "Unusual Case")
+LL_values$analysis <- c( "Logistic", "Prior", "Unconstrained", "Logistic", "Prior", "Unconstrained")
+LL_values$model <- c("Typical Case, Logistic pO2", "Typical Case, Prior Constrained", "Typical Case, Unconstrained","Unusual Case, Logistic pO2", "Unusual Case, Prior Constrained", "Unusual Case, Unconstrained")
+LL_avg <- aggregate(Below_s50~Model, nll_combined, FUN=mean)
+LL_values$LL_avg <- LL_avg$Below_s50
 
-#1D kernel density
-ggplot(nll_combined, aes(y=Below_s50, x=Model, group=Model, fill = Model))+
-  geom_violin(aes(group=Model))+
-  geom_jitter(shape=16, position=position_jitter(0.2))+
- # facet_wrap("Model", ncol=2)+
-  xlab("Model")+
-  ylab("Log-Likelihood for Observations Below true s50 of pO2'")
+# Add separate model and data columns (and remove the comma from the data type) #
+nll_combined$data <- word(nll_combined$Model, 1,2, sep=" ")
+nll_combined$data <- str_sub(nll_combined$data, 1, str_length(nll_combined$data)-1)
+nll_combined$analysis <- word(nll_combined$Model, 3)
 
-ggplot(nll_combined, aes(x=Below_s50, y=Model, group=Model, fill = Model))+
-  geom_density_ridges(alpha=0.1)+
-  #geom_point(color="white", size=3.5, shape="*")+
-  #scale_fill_viridis_c()+
-  #facet_wrap("Model", ncol=2)+
+ggplot(nll_combined, aes(x=Below_s50))+
+  geom_density(fill="lightblue", adjust = 1.5)+
+  facet_grid(analysis~data)+
+  geom_vline(data = LL_values, aes(xintercept = LL_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
   ylab("Density")+
   xlab("Sum Log-Likelihood for Observations Below True s50 of pO2'")
 
-ggplot(nll_combined, aes(y=Below_s50,x=Model, group=Model, fill = Model))+
-  geom_boxplot(aes(group=Model))+
- # geom_jitter(shape=16, position=position_jitter(0.2))+
-  # facet_wrap("Model", ncol=2)+
-  xlab("Model")+
-  ylab("Log-Likelihood for Observations Below true s50 of pO2'")
-
+ggplot(nll_combined, aes(x=Overall))+
+  geom_density(fill="lightblue", adjust = 1.5)+
+  facet_grid(analysis~data)+
+  ylab("Density")+
+  xlab("Sum Log-Likelihood for Observations Below True s50 of pO2'")
 
 # Apply #
 simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
@@ -665,8 +591,57 @@ ggplot(pars_wide1, aes(y=pars_wide1$"unlist(counts_below_zero2)", x=pars_wide1$"
   facet_wrap("model", scales="free")
 
 
+### Other plots of parameter estimates###
+#plot boxplots of a single model #
+ggplot(pars1, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars2, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars3, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
+ggplot(pars4, aes(y=estimate, x=term))+geom_boxplot()+facet_wrap("term", scales="free")+geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+theme(legend.position="left", strip.text = element_blank())
 
-#### Simulation diagnostics ####
+#Plot boxplots of all #
+ggplot(pars, aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = true_pars2, aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = true_pars, aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
+
+#Plot boxplots of just Eo and logistic parameters #
+ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
+
+#Restrict smax #
+pars$estimate2 <- ifelse(pars$estimate>1000 & pars$term=="mi-smax", 1000, pars$estimate)
+
+# Plot just Eo and smax #
+ggplot(subset(pars, pars$term=="mi-Eo"|pars$term=="mi-smax"|pars$term=="mi-s50"|pars$term=="mi-delta"), aes(y=estimate2, x=model))+geom_boxplot(aes(group=model, fill=model))+
+  facet_wrap("term", scales="free")+  
+  geom_hline(data = subset(true_pars, true_pars2$term=="mi-Eo"|true_pars$term=="mi-smax"|true_pars$term=="mi-s50"|true_pars$term=="mi-delta"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  geom_hline(data = subset(true_pars2, true_pars2$term=="mi-Eo"), aes(yintercept = estimate),linetype="dashed", size=1.2)+
+  theme(legend.position="left")+
+  scale_x_discrete(labels=c("1", "2", "3", "4"))
+
+### Other Performance Evlauation Options ###
+
+# SD of average estimate (precision) #
+sd_avg <- aggregate(estimate ~ term+model, pars, FUN=stats::sd)
+# Range of average estimates (precision) #
+range_pars <- aggregate(estimate ~ term+model, pars, FUN=fivenum)
+# Range of standard error (precision) #
+sd_range <- aggregate(std.error~ term+model, pars, FUN=fivenum)
+# Standard deviation of standard error #
+sd_sd <- aggregate(std.error ~ term+model, pars, FUN=stats::sd)
+# Precision #
+#95% range (upper 95% CI--lower 95% CI) #
+pars$con.range <- pars$conf.high-pars$conf.low
+#Average 95% range
+avg_conf.range <- aggregate(con.range ~ term+model, pars, FUN=mean)
+
+### Simulation diagnostics ###
 ## Convergence/fitting errors ##
 convergence1 <- lapply(fits, extract_convergence)
 convergence1 <- bind_rows(convergence1)
