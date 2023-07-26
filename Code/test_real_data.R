@@ -10,12 +10,12 @@ library(sdmTMB)
 source("Code/util_funs.R")
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 15))
+theme_set(theme_bw(base_size = 25))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 ### Load Data ####
-sci_name <- "Anoplopoma fimbria" #"Sebastolobus altivelis" #"Eopsetta jordani" #"Anoplopoma fimbria"
-spc <- "sablefish"#"longspine thornyhead" # "petrale sole" #
+sci_name <-"Anoplopoma fimbria" # "Sebastolobus altivelis"   #"Eopsetta jordani" 
+spc <- "sablefish" #"longspine thornyhead" # "petrale sole" #
 dat.by.size <- length_expand(sci_name)
 dat <- load_data(spc = spc, dat.by.size = dat.by.size)
 
@@ -61,6 +61,7 @@ ggplot(data = dat, aes(x = po2, y = -depth, col = log(cpue_kg_km2+1))) +
   xlim(c(0, 16))
 
 ### Fit Breakpoint model to po2 ####
+#start <- init_vals$"Sebastolobus altivelis"$m1$start
 start <- init_vals$sablefish$m1$start
 #lower<- init_vals$"Sebastolobus altivelis"$m1$lower
 #upper <- init_vals$"Sebastolobus altivelis"$m1$upper
@@ -91,17 +92,17 @@ b_threshold <- m1_pars[grep("b_threshold", m1_parnames)]
 dat$thresh_pred <- exp(brkptfun(x = dat$po2_s, b_slope = b_threshold[1], b_thresh = b_threshold[2]))
 ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
   geom_jitter(width = 0.1, height = 0.01) +
-  scale_colour_viridis_c(limits = c(0, 5), oob = scales::squish)
-  xlim(c(0,5))
+  scale_colour_viridis_c(limits = c(0, 5), oob = scales::squish)+
+  xlim(c(0,5))+
+  ylab("Marginal Effect")
   
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
+start <- init_vals$"Sebastolobus altivelis"$m2$start
 start <- init_vals$sablefish$m2$start
 lower <- init_vals$"Sebastolobus altivelis"$m2$lower
 upper <- init_vals$"Sebastolobus altivelis"$m2$upper
-  
-start <- matrix(c(-1,1,100,0.4))
 
 m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
@@ -113,8 +114,8 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                start = list(b_threshold = start),
-           # lower = list(b_threshold = lower),
-             #  upper = list(b_threshold = upper),
+            #lower = list(b_threshold = lower),
+             # upper = list(b_threshold = upper),
                newton_loops = 2,
                nlminb_loops=2))
 
@@ -132,13 +133,15 @@ dat$Eo_unconstrained <- exp(logfun(dat$po2_prime, model = m2, mi = T))
 ggplot(dat, aes(x = po2_prime, y = Eo_unconstrained, col = log(cpue_kg_km2 + 1))) +
   geom_jitter(width = 0.1, height = 0.01) +
   scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) + 
-  xlim(c(0,5))
+  xlim(c(0,5))+
+  ylab("Marginal Effect")
   
 
 
 ### Fit Eo estimation - po2 prime model (with prior) ####
 ## Set starting parameters:
 
+start <- init_vals$"Sebastolobus altivelis"$m2a$start
 start <- init_vals$sablefish$m2a$start
 
 prior <- normal(c(NA, NA, NA, 0.331), c(NA, NA, NA, 0.176))
@@ -175,7 +178,8 @@ dat$Eo_constrained <- exp(logfun(dat$po2_prime, model = m2a, mi = T))
 ggplot(dat, aes(x = po2_prime, y = Eo_constrained, col = log(cpue_kg_km2 + 1))) +
   geom_jitter(width = 0.1, height = 0.01) +
   scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) +
-  xlim(c(0,5))
+  xlim(c(0,5))+
+  ylab("Marginal Effect")
   
 
 
@@ -211,7 +215,8 @@ dat$logistic_pos <- exp(logfun(dat$po2_s, model = m3, mi = F))
 ggplot(dat, aes(x = po2, y = logistic_pos, col = log(cpue_kg_km2 + 1))) +
   geom_jitter(width = 0.1, height = 0.01) +
   scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish)+
-  xlim(c(0,5))
+  xlim(c(0,5))+
+  ylab("Marginal Effect")
 
 ### Fit null model ####
 m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
@@ -299,22 +304,148 @@ AIC(m8)
 
 ### Create dAIC table ###
 ## Make list of model names##
-models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
 ## Create table and add AIC for each ##
 AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =length(models), dimnames = list(models)))
 AIC[1,] <- AIC(m1)
-AIC[2,] <- AIC(m2)
-AIC[3,] <- AIC(m2a)
-AIC[4,] <- AIC(m3)
-AIC[5,] <- AIC(m4)
-AIC[6,] <- AIC(m5)
-AIC[7,] <- AIC(m6)
-AIC[8,] <- AIC(m7)
-AIC[9,] <- AIC(m8)
+AIC[2,] <- AIC(m2a)
+AIC[3,] <- AIC(m3)
+AIC[4,] <- AIC(m4)
+AIC[5,] <- AIC(m5)
+AIC[6,] <- AIC(m6)
+AIC[7,] <- AIC(m7)
+AIC[8,] <- AIC(m8)
 
 ## Calculate delta-AIC ##
 AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
 
+#### Plot marginal effects w/ +- SE using Tim's sdm_o2 code
+## Breakpoint ##
+# Make model output tidy #
+tidy(m1,"ran_pars",conf.int = TRUE)
+tidy(m1,"fixed", conf.int = TRUE)
+
+# Create new data with everything set to 0 except for pO2 #
+nd_po2 <- data.frame(po2_s = seq(min(dat$po2_s), max(dat$po2_s), length.out = 300), 
+                     temp = 0,
+                     log_depth_scaled = 0,
+                     log_depth_scaled2 = 0,
+                     year = as.factor(2010L)
+                     )
+nd_po2 <- convert_class(nd_po2)
+
+# predict to new data #
+p_o2 <- predict(m1, newdata = nd_po2, se_fit = TRUE, re_form = NA)
+
+# plot predictions with uncertainty
+z <- 1.645 # for 90% CI
+p_o2$po2 <-back.convert(p_o2$po2_s, attr(dat$po2_s, "scaled:center"), attr(dat$po2_s, "scaled:scale"))
+plot_breakpoint <- ggplot(p_o2, aes(x=po2, y=exp(est), 
+                            ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +
+  geom_line() + geom_ribbon(alpha = 0.4) + 
+  scale_x_continuous(limits = c(0, 3), expand = expansion(mult = c(0, 0.0))) +
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+plot_breakpoint
+
+## Constrained Eo ##
+tidy(m2a,"ran_pars",conf.int = TRUE)
+tidy(m2a,"fixed", conf.int = TRUE)
+
+# predict on full dataframe # 
+nd_po2 <- data.frame(po2 = dat$po2, 
+                     invtemp = dat$invtemp,
+                     log_depth_scaled = 0,
+                     log_depth_scaled2 = 0,
+                     year = as.factor(2010L)
+)
+nd_po2 <- convert_class(nd_po2)
+
+#Calculate po2 prime #
+p_o2$prime <- p_o2$po2 * exp(Eo * p_o2$invtemp)
+# Plot--ends up super squiggly #
+ggplot(p_o2, aes(x=prime, y=exp(est),
+                 ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +
+  geom_line() + geom_ribbon(alpha = 0.4) + 
+  scale_y_continuous(limits = c(0, 75), expand = expansion(mult = c(0, 0.0))) +
+  scale_x_continuous(limits = c(0, 1.5), expand = expansion(mult = c(0, 0.0))) +
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+#Try to manually thin it to create a smoother line--this still makes a squiggly plot #
+p_o2 <- arrange(p_o2, p_o2$prime)
+ggplot(p_o2[seq(1, nrow(p_o2), 10), ], aes(x=prime, y=exp(est),
+                                          ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +
+  geom_line() + geom_ribbon(alpha = 0.4) + 
+  scale_y_continuous(limits = c(0, 75), expand = expansion(mult = c(0, 0.0))) +
+  scale_x_continuous(limits = c(0, 1.5), expand = expansion(mult = c(0, 0.0))) +
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+##Option 2: creating new dataframe with smoothed po2 and invtemp #
+# Back-calculate pO2 prime, po2, and invtemp values #
+Eo <- getEo(model = m2a)
+dat$po2_prime <- dat$po2 * exp(Eo * dat$invtemp)
+prime_preds <- data.frame(prime =seq(min(dat$po2_prime), max(dat$po2_prime), length.out=300))
+prime_preds$po2 <- seq(min(dat$po2), max(dat$po2), length.out=300)
+prime_preds$invtemp <- log(prime_preds$prime/prime_preds$po2)/Eo
+prime_preds$test <- prime_preds$po2 * exp(Eo * prime_preds$invtemp)
+
+nd_po2 <- data.frame(po2 = prime_preds$po2, 
+                     invtemp = prime_preds$invtemp,
+                     log_depth_scaled = 0,
+                     log_depth_scaled2 = 0,
+                     year = as.factor(2010L)
+)
+nd_po2 <- convert_class(nd_po2)
+
+# predict to new data--this Rbombs#
+p_o2 <- predict(m2a, newdata = nd_po2, se_fit = TRUE, re_form = NA)
+
+ggplot(p_o2, aes(x=prime, y=exp(est),
+                                           ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +
+  geom_line() + geom_ribbon(alpha = 0.4) + 
+  scale_y_continuous(limits = c(0, 75), expand = expansion(mult = c(0, 0.0))) +
+  scale_x_continuous(limits = c(0, 1.5), expand = expansion(mult = c(0, 0.0))) +
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+## Plot logistic ##
+# Make model output tidy #
+tidy(m3,"ran_pars",conf.int = TRUE)
+tidy(m3,"fixed", conf.int = TRUE)
+
+# Create new data with everything set to 0 except for pO2 #
+nd_po2 <- data.frame(po2_s = seq(min(dat$po2_s), max(dat$po2_s), length.out = 300), 
+                     temp = 0,
+                     log_depth_scaled = 0,
+                     log_depth_scaled2 = 0,
+                     year = as.factor(2010L)
+)
+nd_po2 <- convert_class(nd_po2)
+
+# predict to new data #
+p_o2 <- predict(m3, newdata = nd_po2, se_fit = TRUE, re_form = NA)
+
+# plot predictions with uncertainty
+z <- 1.645 # for 90% CI
+p_o2$po2 <-back.convert(p_o2$po2_s, attr(dat$po2_s, "scaled:center"), attr(dat$po2_s, "scaled:scale"))
+plot_logistic <- ggplot(p_o2, aes(x=po2, y=exp(est), 
+                                    ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +
+  geom_line() + geom_ribbon(alpha = 0.4) + 
+  scale_y_continuous(limits = c(0, 250), expand = expansion(mult = c(0, 0.0))) +
+  scale_x_continuous(limits = c(0, 1), expand = expansion(mult = c(0, 0.0))) +
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+plot_logistic
+
+multipanel <- gridExtra::grid.arrange(breakpoint, logistic, Eo_constrained, nrow = 3, ncol = 1)
+ggsave("plots/marginal_effects.png", multipanel, width = 6, height = 3, units = "in", device = "png")
+
+
+
+
+
+
+
+##### Older versions, ignore ####
 ### Plot depth effects  ####
 ## Set ggplot theme ##
 theme_set(theme_bw(base_size = 30))

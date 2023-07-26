@@ -438,8 +438,8 @@ get_inits <- function() {
   init_vals$petralesole$m3$upper <- upper
 
   start <- matrix(0,2)
-  start[1,1] <- 1 # slope
-  start[2,1] <- -1.00 # threshold
+  start[1,1] <- 20 # slope
+  start[2,1] <- -1.1 # threshold
   init_vals$"Sebastolobus altivelis"$m1$start <- start
   init_vals$"Sebastolobus altivelis"$m1$lower <- c(0.01, -4)
   init_vals$"Sebastolobus altivelis"$m1$upper <- c(2, 2)
@@ -555,4 +555,13 @@ clean_grad <- function(grad, fits){
   #large_grad$proportion <- large_grad$big_grad/length(fits)
   return(large_grad)
 }
+
+# For plotting marginal effects in test_real_data #
+convert_class <- function(x) {
+  for (i in 1:ncol(x)) x[,i] <- as(x[,i], Class = "matrix")
+  return(x)
+}
+
+back.convert <- function(x, mean_orig, sd_orig) (x* sd_orig+mean_orig)
+
 
