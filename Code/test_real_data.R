@@ -353,16 +353,18 @@ tidy(m2a,"ran_pars",conf.int = TRUE)
 tidy(m2a,"fixed", conf.int = TRUE)
 
 # predict on full dataframe # 
-nd_po2 <- data.frame(po2 = dat$po2, 
-                     invtemp = dat$invtemp,
+nd_po2 <- data.frame(po2 = seq(min(dat$po2), max(dat$po2), length.out = 300), 
+                     invtemp = mean(dat$invtemp),
                      log_depth_scaled = 0,
                      log_depth_scaled2 = 0,
                      year = as.factor(2010L)
 )
 nd_po2 <- convert_class(nd_po2)
+p_o2 <- predict(m2a, newdata = nd_po2, se_fit = TRUE, re_form = NA)
 
 #Calculate po2 prime #
 p_o2$prime <- p_o2$po2 * exp(Eo * p_o2$invtemp)
+
 # Plot--ends up super squiggly #
 ggplot(p_o2, aes(x=prime, y=exp(est),
                  ymin = exp(est - z *est_se), ymax = exp(est + z * est_se))) +

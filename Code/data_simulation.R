@@ -128,13 +128,16 @@ sim_test <- simdat[[1]]
 sim_test2 <- simdat2[[1]]
 
 ggplot(dat, aes(x=po2_s,y=cpue_kg_km2))+geom_point(size=0.6)+geom_point(sim_test, mapping=aes(x=po2_s, y=sim), color="blue", size=0.6)
+
+#Percent below threshold
+sim_test3 <- subset(sim_test, sim_test$mi_usual <s50)
 }
 
 #Save simulated data
-save <- F
+save <- T
 if(save){
-saveRDS(data_sims_usual, "data_sims_usual.rds")
-saveRDS(data_sims_weird, "data_sims_weird.rds")
+saveRDS(simdat, "data_sims_usual.rds")
+saveRDS(simdat2, "data_sims_weird.rds")
 }
 
 
@@ -179,7 +182,7 @@ fits3 <- lapply(simdat2, run_sdmTMB_noprior,
 fits4 <- lapply(simdat2, run_sdmTMB_prior, 
                 start=start_unusual, mesh=mesh)
 
-#Save models
+  #Save models
 if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")
 }
@@ -259,6 +262,7 @@ rmse$n <- NULL
 rmse$error2 <- NULL
 
 #Create dataframe for plotting
+
 Eo_values <- as.data.frame(matrix(nrow=4))
 Eo_values$V1 <- NULL
 Eo_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
@@ -307,6 +311,9 @@ Eo_performance <- subset(par_performance, Parameter=="mi-Eo")
 s50_performance <- subset(par_performance, Parameter=="mi-s50")
 
 ### Plot parameter estimates ###
+# Reorder
+pars$analysis <- factor(pars$analysis, levels = c("Unconstrained", "Prior Constrained"))
+Eo_values$analysis <- factor(Eo_values$analysis, levels = c("Unconstrained", "Prior Constrained"))
 #Density plot just Eo #
 ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
@@ -317,6 +324,8 @@ ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   theme(strip.text = element_text(size = 14))
 
  # Density plot s50 #
+#Reorder 
+s50_values$analysis <- factor(s50_values$analysis, levels = c("Unconstrained", "Prior Constrained"))
 ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
   geom_vline(data = s50_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
@@ -552,7 +561,7 @@ ggplot(smax_test, aes(x=po2_prime, y=value))+geom_point(aes(group=name, color=na
 
 
 
-### Extra stuff ###
+##### Extra stuff---ignore #####
 ##Correlation of Eo and number of zero observations in dataset #
 # Make wide #
 pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
