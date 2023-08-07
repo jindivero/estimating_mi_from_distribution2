@@ -102,7 +102,13 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
 
 ### Simulate data under typical Eo ####
+use_previous <- T
+if(use_previous){
+  simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
+ simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
+}
 
+if(~use_previous){
 simdat <- map(seq_len(n), ~simulate_fish(dat = dat,
                         mesh = mesh,
                         s50 = s50,
@@ -118,7 +124,7 @@ simdat2 <- map(seq_len(n), ~simulate_fish(dat = dat,
                             smax = smax,
                             Eo = Eo2,
                             modelpars = model.pars))
-
+}
 ###Sanity checks on simulated data
 
 ## Compare one to the real sablefish data ##
@@ -134,7 +140,7 @@ sim_test3 <- subset(sim_test, sim_test$mi_usual <s50)
 }
 
 #Save simulated data
-save <- T
+save <- F
 if(save){
 saveRDS(simdat, "data_sims_usual.rds")
 saveRDS(simdat2, "data_sims_weird.rds")
@@ -519,15 +525,85 @@ ggplot(nll_combined, aes(x=Overall))+
   geom_density(fill="lightblue", adjust = 1.5)+
   facet_grid(analysis~data)+
   ylab("Density")+
-  xlab("Sum Log-Likelihood for Observations Below True s50 of pO2'")
+  xlab("Sum Log-Likelihood for All Observations'")
 
+### Comparing po2' and predictions for all simulations (to see how predictions compare to parameters) ###
+## Predictions of fish density on original data for unconstrained models ##
+pred1<- mapply(FUN=predict_sims, fits, simdat, p, phi, SIMPLIFY=F)
+pred2<- mapply(FUN=predict_sims, fits3, simdat2, p, phi, SIMPLIFY=F)
+## Calculate po2 prime from estimated parameters for each ##
+simdats1 <- mapply(FUN=calculate_po2_prime, pred1,fits, SIMPLIFY=F)
+simdats2 <- mapply(FUN=calculate_po2_prime, pred2,fits3, SIMPLIFY=F)
+
+##Remove datasets with NA and then bind together, adding a column with the data frame number ##
+simdats1 <- keep(.x=simdats1, .p=is.data.frame)
+simdats1 <- bind_rows(simdats1, .id="df")
+simdats2 <- keep(.x=simdats2, .p=is.data.frame)
+simdats2 <- bind_rows(simdats2, .id="df")
+## Plot all ##
+# Points #
+ggplot(simdats1, aes(po2_prime, pred2, colour=as.factor(df))) +
+  geom_point(size=0.1)+
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("pO2'")+
+  ylab("Predicted density")+
+  theme(legend.position="none")
+# Density plot #
+ggplot(simdats1, aes(po2_prime, pred2, colour=as.factor(df))) +
+  geom_density_2d()+
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("pO2'")+
+  ylab("Predicted density")+
+  theme(legend.position="none")
+
+## Just a couple
+# Points #
+ggplot(subset(simdats1, simdats1$df=="1"|simdats1$df=="19"), aes(po2_prime, pred2, colour=as.factor(df))) +
+  geom_point(size=2)+
+ scale_colour_viridis(discrete=TRUE, labels=c('E0=0.68, s50=2.4, smax=129', "E0=0 -0.056, s50=1.4, smax=22"))+
+  xlab("pO2'")+
+  ylab("Predicted density")+
+  theme(legend.position=c(0.7,0.8))
+
+## Just a couple
+# Density # (this looks weird)
+ggplot(subset(simdats1, simdats1$df=="1"|simdats1$df=="19"), aes(po2_prime, pred2, colour=as.factor(df))) +
+  stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) +
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("pO2'")+
+  ylab("Predicted density")
+
+#### Covariance of parameters
+# Make dataframe of all parameter estimates wide #
+pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
+### Plot Eo vs s50 ###
+## Plot all together ##
+ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-s50"))+ geom_point(aes(group=model, color=model), size=5)+xlab("Eo estimate")+ylab("s50 estimate")+
+  theme(legend.position=c(0.3,0.8))
+# Plot all together in facet grid # 
+ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-s50"))+ geom_point(size=5)+xlab("Eo estimate")+facet_wrap("model", scales="free")+ylab("s50 estimate")
+
+# Subset just one model # 
+pars_wide1 <- subset(pars_wide, pars_wide$model=="Typical Case, Unconstrained")
+ggplot(subset(pars_wide1), aes(x=pars_wide1$"mi-Eo", y=pars_wide1$"mi-s50"))+ geom_point(size=5)
+
+ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-smax"))+ geom_point(aes(group=model, color=model), size=5)+xlab("Eo estimate")+ylab("s50 estimate")+
+  theme(legend.position=c(0.2,0.8))
+##### Extra stuff---ignore #####
 # Apply #
 simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
 
-
-
 # Apply #
 simdats1 <- mapply(FUN=logfun_all, simdats1, fits)
+ggplot(bind_rows(simdats2, .id="df"), aes(po2_prime, logfun, colour=as.factor(df))) +
+  geom_point(size=0.1)+
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("pO2'")+
+  ylab("Predicted density")
 
 
 # Plot #
@@ -560,8 +636,6 @@ ggplot(smax_test, aes(x=po2_prime, y=value))+geom_point(aes(group=name, color=na
   scale_colour_discrete(type="viridis", "smax value", labels=c("5", "20", "50", "100", "500", "1000", "10000"))+theme(legend.position=c(0.8,0.2))
 
 
-
-##### Extra stuff---ignore #####
 ##Correlation of Eo and number of zero observations in dataset #
 # Make wide #
 pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
