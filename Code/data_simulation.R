@@ -108,7 +108,7 @@ if(use_previous){
  simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
 }
 
-if(~use_previous){
+if(!use_previous){
 simdat <- map(seq_len(n), ~simulate_fish(dat = dat,
                         mesh = mesh,
                         s50 = s50,
@@ -178,6 +178,10 @@ start4[4,1] <- Eo2
 
 
 ## Fit model to all simulated datasets ##
+if(use_previous){
+  load("model_fits.Rdata")
+}
+if(!use_previous){
 fits <- lapply(simdat, run_sdmTMB_noprior, 
                 start=start, mesh=mesh)
 fits2 <- lapply(simdat, run_sdmTMB_prior, 
@@ -187,8 +191,9 @@ fits3 <- lapply(simdat2, run_sdmTMB_noprior,
                 start=start_unusual, mesh=mesh)
 fits4 <- lapply(simdat2, run_sdmTMB_prior, 
                 start=start_unusual, mesh=mesh)
-
+}
   #Save models
+save <- F
 if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")
 }
@@ -527,7 +532,42 @@ ggplot(nll_combined, aes(x=Overall))+
   ylab("Density")+
   xlab("Sum Log-Likelihood for All Observations'")
 
-### Comparing po2' and predictions for all simulations (to see how predictions compare to parameters) ###
+#### Comparing po2' and predictions for all simulations (to see how predictions compare to parameters) ####
+#calculate the po2' estimated from the Eo, use that to calculate f(po2')
+simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
+simdats2 <- mapply(FUN=calculate_po2_prime, simdat2,fits3, SIMPLIFY=F)
+
+#plot true po2 vs exp(f(po2'estimated) (either as points or lines)
+simdats1 <- mapply(FUN=logfun2, simdats1,"po2_prime", fits, SIMPLIFY=F)
+simdats2 <- mapply(FUN=logfun2, simdats2,"po2_prime", fits3, SIMPLIFY=F)
+
+##Remove datasets with NA and then bind together, adding a column with the data frame number ##
+simdats1 <- keep(.x=simdats1, .p=is.data.frame)
+simdats1 <- bind_rows(simdats1, .id="df")
+simdats2 <- keep(.x=simdats2, .p=is.data.frame)
+simdats2 <- bind_rows(simdats2, .id="df")
+
+ggplot(simdats1, aes(mi_usual, logmu, colour=as.factor(df))) +
+  geom_point(size=0.1)+
+  scale_colour_viridis(discrete=TRUE)+
+  xlab("True pO2'")+
+  ylab("Estimated pO2' effect")+
+  theme(legend.position="none")
+
+ggplot(simdats1, aes(mi_usual, logmu, colour=Eo)) +
+  geom_point(size=0.1)+
+  scale_colour_viridis()+
+  xlab("True pO2'")+
+  ylab("Estimated pO2' effect")
+
+ggplot(simdats1, aes(mi_usual, logmu, colour=Eo)) +
+  geom_point(size=0.1)+
+  scale_colour_viridis()+
+  xlab("True pO2'")+
+  ylab("Estimated pO2' effect")
+
+##### Extra stuff---ignore #####
+###Comparing po2' and predictions for all simulations (to see how predictions compare to parameters) ###
 ## Predictions of fish density on original data for unconstrained models ##
 pred1<- mapply(FUN=predict_sims, fits, simdat, p, phi, SIMPLIFY=F)
 pred2<- mapply(FUN=predict_sims, fits3, simdat2, p, phi, SIMPLIFY=F)
@@ -593,7 +633,6 @@ ggplot(subset(pars_wide1), aes(x=pars_wide1$"mi-Eo", y=pars_wide1$"mi-s50"))+ ge
 
 ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-smax"))+ geom_point(aes(group=model, color=model), size=5)+xlab("Eo estimate")+ylab("s50 estimate")+
   theme(legend.position=c(0.2,0.8))
-##### Extra stuff---ignore #####
 # Apply #
 simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
 

@@ -171,6 +171,32 @@ logfun_basic <- function(mi, smax, s50, delta){
   logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * mi)) -1))
 }
 
+logfun2 <- function(data, po2_prime, model) {
+  if(!is.character(model)){
+  parfit <- model$sd_report
+  npars <- length(parfit$value)
+  parnames <- names(parfit$value)
+  
+  s50 <- parfit$value[grep("s50", parnames)]
+  delta <- parfit$value[grep("s95", parnames)]
+  smax <- parfit$value[grep("s_max", parnames)]
+  Eo <- parfit$value[grep("Eo", parnames)]
+  
+  a <- log(smax / (log(0.5) + smax) - 1)
+  b <- log(smax / (log(0.95) + smax) - 1)
+  beta0 <- -a + s50 * (b - a) / delta
+  beta1 <- (a - b) / delta
+  x <- as.numeric(data[ , po2_prime])
+  data$logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * x)) -1))
+  data$Eo <- Eo
+  data$s50 <- s50
+  }
+  if(is.character(model)){
+   data <- NA
+  }
+  return(data)
+} 
+
 ## Number of zero observations below threshold for each data simulation ##
 count_below_zero <- function(dat, threshold) {
   count <- subset(dat, dat$sim==0 & dat$mi_weird < threshold)

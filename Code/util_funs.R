@@ -330,6 +330,7 @@ logfun <- function(x, model, mi = F) {
   
   return(logmu)
 } 
+
 getEo <- function(model) {
   parfit <- model$sd_report
   npars <- length(parfit$value)
