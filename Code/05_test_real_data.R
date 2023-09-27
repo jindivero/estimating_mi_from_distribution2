@@ -91,7 +91,8 @@ b_threshold <- m1_pars[grep("b_threshold", m1_parnames)]
 ##### plot ####
 dat$thresh_pred <- exp(brkptfun(x = dat$po2_s, b_slope = b_threshold[1], b_thresh = b_threshold[2]))
 ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
-  geom_jitter(width = 0.1, height = 0.01) +
+  geom_point()
+  #geom_jitter(width = 0.1, height = 0.01) +
   scale_colour_viridis_c(limits = c(0, 5), oob = scales::squish)+
   xlim(c(0,5))+
   ylab("Marginal Effect")
