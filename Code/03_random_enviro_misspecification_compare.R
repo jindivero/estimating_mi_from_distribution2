@@ -36,6 +36,7 @@ library(viridis)
 theme_set(theme_bw(base_size = 30))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
+#
 ### load helper functions ####
 source("Code/util_funs.R")
 source("Code/sim_funs.R")
@@ -160,7 +161,7 @@ simdat2_ran <- lapply(env_sims, simulate_fish,
 #Save? #
 save <- T
 if(save){
-  saveRDS(simdat_ran, "data_sims_usua_ran.rds")
+  saveRDS(simdat_ran, "data_sims_usual_ran.rds")
   saveRDS(simdat2_ran, "data_sims_weird_ran.rds")
 }
 
@@ -524,6 +525,18 @@ ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   facet_grid(analysis~data)+
   xlab("s50 estimate") + 
   theme(strip.text = element_text(size = 14))
+
+#### Covariance of parameters
+## Make dataframe of all parameter estimates wide ##
+pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
+## Plot Eo vs s50##
+pars_wide2 <- subset(pars_wide, model=="Typical Case, Prior Constrained")
+ggplot(pars_wide2, aes(x=pars_wide2$"mi-Eo", y=pars_wide2$"mi-s50"))+ geom_point(size=5)+xlab("Eo estimate")+ylab("s50 estimate")
+## Plot vs covariance of real data
+pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
+pars_wide3 <- subset(pars_wide, model=="Typical Case, Prior Constrained")
+ggplot(pars_wide2, aes(x=pars_wide2$"mi-Eo", y=pars_wide2$"mi-s50"))+ geom_point(size=5)+geom_point(data=pars_wide3, aes(x=pars_wide3$"mi-Eo", y=pars_wide3$"mi-s50"), size=5, color='blue')+xlab("Eo estimate")+ylab("s50 estimate")
+
 
 # Plot accuracy and precision comparison #
 # Merge #

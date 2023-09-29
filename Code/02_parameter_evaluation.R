@@ -254,3 +254,6 @@ pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_fro
 ## Plot Eo vs s50 ##
 ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-s50"))+ geom_point(aes(group=model, color=model), size=5)+xlab("Eo estimate")+ylab("s50 estimate")+
   theme(legend.position=c(0.3,0.8))
+#Just 
+pars_wide2 <- subset(pars_wide, model=="Typical Case, Prior Constrained")
+ggplot(pars_wide2, aes(x=pars_wide2$"mi-Eo", y=pars_wide2$"mi-s50"))+ geom_point(size=5)+xlab("Eo estimate")+ylab("s50 estimate")
