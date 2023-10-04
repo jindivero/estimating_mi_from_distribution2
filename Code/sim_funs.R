@@ -102,7 +102,7 @@ predict_sims <- function(x, new_data, p, phi){
 
 ### Run alternative models for each data simulation ###
 run_alt_models <- function(dat, start, mesh) {
-  m1 <- try(sdmTMB(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
+  m1 <- try(sdmTMB(sim ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
                data = dat,
                time = NULL,
                reml = F,
@@ -117,7 +117,7 @@ run_alt_models <- function(dat, start, mesh) {
                  #newton_loops = 2
   ))
   
-  m2 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+  m2 <- try(sdmTMB(sim ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
                data = dat, 
                time = NULL,
                reml = F,
@@ -132,7 +132,7 @@ run_alt_models <- function(dat, start, mesh) {
                  newton_loops = 2,
                  nlminb_loops=2)))
   
-  m2a <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
+  m2a <- try(sdmTMB(sim ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
                 data = dat, 
                 time = NULL,
                 reml = F,
@@ -147,7 +147,7 @@ run_alt_models <- function(dat, start, mesh) {
                   newton_loops = 2),
                priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
   
-  m3 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
+  m3 <- try(sdmTMB(sim ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -160,7 +160,7 @@ run_alt_models <- function(dat, start, mesh) {
                  #  lower = list(b_threshold = lower),
                  #  upper = list(b_threshold = upper)
                )))
-  m4 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
+  m4 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+log_depth_scaled2, 
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -172,7 +172,7 @@ run_alt_models <- function(dat, start, mesh) {
                  newton_loops = 2,
                )))
 
-  m5 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
+  m5 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -183,7 +183,7 @@ run_alt_models <- function(dat, start, mesh) {
                control = sdmTMBcontrol(
                  newton_loops = 1,
                )))
-  m6 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
+  m6 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -193,7 +193,7 @@ run_alt_models <- function(dat, start, mesh) {
                family =tweedie(link="log"),
                control = sdmTMBcontrol(newton_loops = 1,
                )))
-  m7 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
+  m7 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -203,7 +203,7 @@ run_alt_models <- function(dat, start, mesh) {
                family =tweedie(link="log"),
                control = sdmTMBcontrol(newton_loops = 1,
                )))
-  m8 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
+  m8 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
                data = dat, 
                spatial = "on",
                mesh=mesh,
@@ -213,118 +213,6 @@ run_alt_models <- function(dat, start, mesh) {
                family =tweedie(link="log"),
                control = sdmTMBcontrol(newton_loops = 1,
                )))
-run_alt_models2 <- function(dat, start, mesh) {
-    m1 <- try(sdmTMB(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled, 
-                     data = dat,
-                     time = NULL,
-                     reml = F,
-                     anisotropy = TRUE,
-                     spatiotemporal = FALSE,
-                     mesh=mesh,
-                     family =tweedie(link="log"),
-                     # control = sdmTMBcontrol(
-                     #start = list(b_threshold = start),
-                     #lower = list(b_threshold = lower), 
-                     #upper = list(b_threshold = upper),
-                     #newton_loops = 2
-    ))
-    
-    m2 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled, 
-                     data = dat, 
-                     time = NULL,
-                     reml = F,
-                     anisotropy = TRUE,
-                     spatiotemporal = FALSE,
-                     mesh=mesh,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(
-                       start = list(b_threshold = start),
-                       #lower = list(b_threshold = lower),
-                       # upper = list(b_threshold = upper),
-                       newton_loops = 2,
-                       nlminb_loops=2)))
-    
-    m2a <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled,
-                      data = dat, 
-                      time = NULL,
-                      reml = F,
-                      anisotropy = TRUE,
-                      spatiotemporal = FALSE,
-                      mesh=mesh,
-                      family =tweedie(link="log"),
-                      control = sdmTMBcontrol(
-                        start = list(b_threshold = start),
-                        #   upper = list(b_threshold = upper),
-                        #  lower = list(b_threshold = lower),
-                        newton_loops = 2),
-                      priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
-    
-    m3 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled,
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(
-                       start = list(b_threshold=start),
-                       #  lower = list(b_threshold = lower),
-                       #  upper = list(b_threshold = upper)
-                     )))
-    m4 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled, 
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(
-                       newton_loops = 2,
-                     )))
-    
-    m5 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+temp_s,
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(
-                       newton_loops = 1,
-                     )))
-    m6 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+po2_s,
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(newton_loops = 1,
-                     )))
-    m7 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+temp_s + po2_s,
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(newton_loops = 1,
-                     )))
-    m8 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
-                     data = dat, 
-                     spatial = "on",
-                     mesh=mesh,
-                     anisotropy=T,
-                     reml=F,
-                     time=NULL,
-                     family =tweedie(link="log"),
-                     control = sdmTMBcontrol(newton_loops = 1,
-                     )))
   ### Create dAIC table ###
   ## Make list of model names##
   models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
@@ -341,9 +229,283 @@ run_alt_models2 <- function(dat, start, mesh) {
   AIC[9,] <- try(AIC(m8))
   
   ## Calculate delta-AIC ##
-  AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
+  AIC$V1 <- as.numeric(AIC$V1)
+  AIC$dAIC <- try(abs(min(AIC$V1, na.rm=T)-(AIC$V1)))
   AIC$model <- models
-  return(AIC)
+  try(return(AIC))
+}
+
+run_alt_models_mis <- function(dat, start, mesh) {
+  m1 <- try(sdmTMB(sim ~ 1+year+breakpt(po2_s)+log_depth_scaled, 
+                   data = dat,
+                   time = NULL,
+                   reml = F,
+                   anisotropy = TRUE,
+                   spatiotemporal = FALSE,
+                   mesh=mesh,
+                   family =tweedie(link="log"),
+                   # control = sdmTMBcontrol(
+                   #start = list(b_threshold = start),
+                   #lower = list(b_threshold = lower), 
+                   #upper = list(b_threshold = upper),
+                   #newton_loops = 2
+  ))
+  
+  m2a <- try(sdmTMB(sim ~ -1+year+logistic(mi)+log_depth_scaled,
+                    data = dat, 
+                    time = NULL,
+                    reml = F,
+                    anisotropy = TRUE,
+                    spatiotemporal = FALSE,
+                    mesh=mesh,
+                    family =tweedie(link="log"),
+                    control = sdmTMBcontrol(
+                      start = list(b_threshold = start),
+                      #   upper = list(b_threshold = upper),
+                      #  lower = list(b_threshold = lower),
+                      newton_loops = 2),
+                    priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
+  
+  m3 <- try(sdmTMB(sim ~ -1+year+logistic(po2_s)+log_depth_scaled,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     start = list(b_threshold=start),
+                     #  lower = list(b_threshold = lower),
+                     #  upper = list(b_threshold = upper)
+                   )))
+  m4 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled, 
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     newton_loops = 2,
+                   )))
+  
+  m5 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+temp_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     newton_loops = 1,
+                   )))
+  m6 <- try(sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  m7 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+temp_s + po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  m8 <- try(sdmTMB(sim ~ -1+year+log_depth_scaled+temp_s * po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  ### Create dAIC table ###
+  ## Make list of model names##
+  models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+  ## Create table and add AIC for each ##
+  AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =length(models), dimnames = list(models)))
+  AIC[1,] <- try(AIC(m1))
+  AIC[2,] <- try(AIC(m2a))
+  AIC[3,] <- try(AIC(m3))
+  AIC[4,] <- try(AIC(m4))
+  AIC[5,] <- try(AIC(m5))
+  AIC[6,] <- try(AIC(m6))
+  AIC[7,] <- try(AIC(m7))
+  AIC[8,] <- try(AIC(m8))
+  
+  ## Calculate delta-AIC ##
+  AIC$V1 <- as.numeric(AIC$V1)
+  AIC$dAIC <- try(abs(min(AIC$V1, na.rm=T)-(AIC$V1)))
+  AIC$model <- models
+  try(return(AIC))
+}
+### Run alternative models for each data simulation ###
+run_alt_models_cv <- function(dat, start, mesh) {
+  seed <- sample(1:2000, 1)
+  set.seed(seed)
+  k_folds <- 5
+  dat$fold_ids <- sample(seq_len(k_folds), nrow(dat), replace = TRUE)
+  future::plan(future::multisession)
+  m1 <- try(sdmTMB_cv(sim ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
+                   data = dat,
+                   time = NULL,
+                   reml = F,
+                   anisotropy = TRUE,
+                   spatiotemporal = FALSE,
+                   mesh=mesh,
+                   k_folds=k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   # control = sdmTMBcontrol(
+                   #start = list(b_threshold = start),
+                   #lower = list(b_threshold = lower), 
+                   #upper = list(b_threshold = upper),
+                   #newton_loops = 2
+  ))
+  
+  m2 <- try(sdmTMB_cv(sim ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+                   data = dat, 
+                   time = NULL,
+                   reml = F,
+                   anisotropy = TRUE,
+                   spatiotemporal = FALSE,
+                   mesh=mesh,
+                   k_folds=k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     start = list(b_threshold = start),
+                     #lower = list(b_threshold = lower),
+                     # upper = list(b_threshold = upper),
+                     newton_loops = 2,
+                     nlminb_loops=2)))
+  
+  m2a <- try(sdmTMB_cv(sim ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
+                    data = dat, 
+                    time = NULL,
+                    reml = F,
+                    anisotropy = TRUE,
+                    spatiotemporal = FALSE,
+                    k_folds=k_folds,
+                    fold_ids = dat$fold_ids,
+                    mesh=mesh,
+                    family =tweedie(link="log"),
+                    control = sdmTMBcontrol(
+                      start = list(b_threshold = start),
+                      #   upper = list(b_threshold = upper),
+                      #  lower = list(b_threshold = lower),
+                      newton_loops = 2),
+                    priors=sdmTMBpriors(threshold = normal(c(NA, NA, NA, 0.3477), c(NA, NA, NA, 0.1455)))))
+  
+  m3 <- try(sdmTMB_cv(sim ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   k_folds=k_folds,
+                   fold_ids = dat$fold_ids,
+                   control = sdmTMBcontrol(
+                     start = list(b_threshold=start),
+                     #  lower = list(b_threshold = lower),
+                     #  upper = list(b_threshold = upper)
+                   )))
+  m4 <- try(sdmTMB_cv(sim ~ -1+year+log_depth_scaled+log_depth_scaled2, 
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   k_folds=k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     newton_loops = 2,
+                   )))
+  
+  m5 <- try(sdmTMB_cv(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   k_folds,
+                   fold_ids = dat$fold_ids,
+                   time=NULL,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(
+                     newton_loops = 1,
+                   )))
+  m6 <- try(sdmTMB_cv(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  m7 <- try(sdmTMB_cv(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  m8 <- try(sdmTMB_cv(sim ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
+                   data = dat, 
+                   spatial = "on",
+                   mesh=mesh,
+                   anisotropy=T,
+                   reml=F,
+                   time=NULL,
+                   k_folds,
+                   fold_ids = dat$fold_ids,
+                   family =tweedie(link="log"),
+                   control = sdmTMBcontrol(newton_loops = 1,
+                   )))
+  ### Create dAIC table ###
+  ## Make list of model names##
+  models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+  ## Create table and add LL for each ##
+  LL <- as.data.frame(matrix(NA, ncol = 3, nrow =length(models), dimnames = list(models)))
+  LL$model <- models
+  LL$model_id <- 1:9
+  LL[1,3] <-try(m1$sum_loglik)
+  LL[2,3] <-try(m2$sum_loglik)
+  LL[3,3] <-try(m2a$sum_loglik)
+  LL[4,3] <-try(m3$sum_loglik)
+  LL[5,3] <-try(m4$sum_loglik)
+  LL[6,3] <-try(m5$sum_loglik)
+  LL[7,3] <-try(m6$sum_loglik)
+  LL[8,3] <-try(m7$sum_loglik)
+  LL[9,3] <-try(m8$sum_loglik)
+  LL$V1 <- as.numeric(LL$V1)
+  try(return(LL))
 }
 
 ### Negative log probability of observations given model fit ###

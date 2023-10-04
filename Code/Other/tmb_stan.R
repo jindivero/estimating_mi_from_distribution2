@@ -9,14 +9,9 @@ fit_mle <- fits[[1]]
 #Pass to tmbstan
 fit_stan <- tmbstan::tmbstan(
   fit_mle$tmb_obj,
-  iter = 10000, chains = 3,
-  seed = 8217, # ensures repeatability
-  control = list(adapt_delta = 0.9, max_treedepth = 12)
-)
-
-tmbstan::tmbstan(
-  ...,
-  control = list(adapt_delta = 0.9, max_treedepth = 12)
+  iter = 1000, chains = 3,
+  seed = 8217 # ensures repeatability
+  #control = list(adapt_delta = 0.9, max_treedepth = 12)
 )
 
 fit_stan

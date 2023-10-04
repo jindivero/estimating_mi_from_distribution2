@@ -1,5 +1,7 @@
 library(sdmTMB)
 library(stringr)
+install.packages("ggbeeswarm")
+library(ggbeeswarm)
 
 ### Set ggplot themes ###
 theme_set(theme_bw(base_size = 30))
@@ -15,6 +17,11 @@ if(use_previous==T){
   load("model_fits_mis.Rdata")
   load("model_fits_ran.Rdata")
 }
+if(use_previous==T){
+  load("data_sims_usual_ran.rds")
+  load("data_sims_weird_ran.rds")
+}
+
 #Load data, start, mesh
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
@@ -29,10 +36,11 @@ start_unusual[4,1] <- Eo2
 
 compare1 <- lapply(simdat, run_alt_models, start, mesh)
 compare2 <- lapply(simdat2, run_alt_models, start_unusual, mesh)
-compare3 <- lapply(simdat, run_alt_models2, start, mesh)
+compare3 <- lapply(simdat, run_alt_models_mis, start, mesh)
+compare4 <- lapply(simdat2, run_alt_models_mis, start_unusual, mesh)
 
-if(save==T){
-  save(compare1, compare2, file="simulation_AIC.R")
+if(save){
+  save(compare1, compare2, compare3, compare4, file="AIC.Rdata")
 }
 if(use_previous){
   load("simulation_AIC.R")
@@ -46,15 +54,50 @@ AIC2 <- keep(.x=compare2, .p=is.data.frame)
 AIC2 <- bind_rows(compare2, .id="df")
 AIC2$model <- rep(1:9, 100) 
 
-# Plot
-ggplot(AIC1, aes(x=model, y=dAIC))+geom_point(aes(color=model))
+AIC3 <- keep(.x=compare3, .p=is.data.frame)
+AIC3 <- bind_rows(compare3, .id="df")
+AIC3$model <- rep(c(1,3,4,5,6,7,8,9), 100) 
 
-#Summary table
+AIC4 <- keep(.x=compare4, .p=is.data.frame)
+AIC4 <- bind_rows(compare4, .id="df")
+AIC4$model <- rep(c(1,3,4,5,6,7,8,9), 100) 
+
+# Plot
+ggplot(AIC1, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))+theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+scale_color_discrete(labels=c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2"))
+ggplot(AIC2, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
+ggplot(AIC3, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
+ggplot(AIC4, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
+
+ggplot(AIC1, aes(x=df, y=dAIC))+geom_col(aes(color=as.factor(model), group=as.factor(model)))+theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+scale_color_discrete(labels=c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2"))
+
+
+#Average AIC
 AIC_summary <- aggregate(dAIC~model, data=AIC1, FUN=mean)
 AIC_summary$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
 
 AIC_summary2 <- aggregate(dAIC~model, data=AIC2, FUN=mean)
 AIC_summary2$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+
+AIC_summary3 <- aggregate(dAIC~model, data=AIC3, FUN=mean)
+AIC_summary3$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+
+AIC_summary4 <- aggregate(dAIC~model, data=AIC4, FUN=mean)
+AIC_summary4$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+
+#Count best-fitting model of each type
+AIC_count1 <- subset(AIC1, AIC1$dAIC==0)
+AIC_count2 <- subset(AIC2, AIC2$dAIC==0)
+AIC_count3 <- subset(AIC3, AIC3$dAIC==0)
+AIC_count4 <- subset(AIC4, AIC4$dAIC==0)
+AIC_count1 <- aggregate(df~model, data=AIC_count1, FUN=length)
+AIC_count2 <- aggregate(df~model, data=AIC_count2, FUN=length)
+AIC_count3 <- aggregate(df~model, data=AIC_count3, FUN=length)
+AIC_count4 <- aggregate(df~model, data=AIC_count4, FUN=length)
+
+###Cross-validation ###
+
+compare1 <- lapply(test, run_alt_models_cv, start, mesh)
+
 
 
 

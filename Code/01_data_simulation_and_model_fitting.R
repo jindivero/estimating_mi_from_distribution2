@@ -86,7 +86,7 @@ range <- 85
 sigma_O <- 1.77
 
 ## Set how many data sets to produce ##
-n <- 100
+n <- 250
 
 ## Make list of parameter values ##
 model.pars <- list(b_years = b_years,
@@ -100,7 +100,7 @@ model.pars <- list(b_years = b_years,
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
 ### Simulate data under typical Eo ####
-use_previous <- T
+use_previous <- F
 if(use_previous){
   simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
  simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
@@ -190,7 +190,7 @@ fits3 <- lapply(simdat2, run_sdmTMB_noprior,
 fits4 <- lapply(simdat2, run_sdmTMB_prior, 
                 start=start_unusual, mesh=mesh)
 }
-  #Save models
+  m#Save models
 save <- F
 if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")

@@ -32,7 +32,7 @@ library(ggridges)
 library(viridis)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 30))
+theme_set(theme_bw(base_size = 35))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 ### load helper functions ####
@@ -113,6 +113,20 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 
+#Cumulative RMSE for determining if enough simulations
+Eo_all <- subset(pars, term=="mi-s50")
+Eo_all1 <- subset(Eo_all, model=="Typical Case, Unconstrained")
+
+RMSE_sums <- matrix(nrow=250, ncol=1, NA)
+for(i in 1:nrow(Eo_all1)){
+  x <- Eo_all1[1:i,]
+  total <- sum(x$error2)
+  cum_rmse <- total/nrow(x)
+  RMSE_sums[i] <- cum_rmse
+}
+
+plot(RMSE_sums, type="b")
+
 #Create dataframe for plotting
 
 Eo_values <- as.data.frame(matrix(nrow=4))
@@ -175,6 +189,18 @@ ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   xlab("Eo estimate") + 
   theme(strip.text = element_text(size = 14))
 
+#Add prior distribution
+ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
+  geom_density(fill="lightblue", adjust = 1.5) +
+  geom_vline(data = Eo_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
+  geom_vline(data = Eo_values, aes(xintercept = true),linetype="dashed", size=1.2)+
+  facet_grid(analysis~data)+
+  xlab("Eo estimate") + 
+  theme(strip.text = element_text(size = 14))+
+  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed", geom="area", alpha=0.2)+
+  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed")+
+  ylab("Density of data simulations")
+
 # Density plot s50 #
 #Reorder 
 s50_values$analysis <- factor(s50_values$analysis, levels = c("Unconstrained", "Prior Constrained"))
@@ -185,11 +211,6 @@ ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   facet_grid(analysis~data)+
   xlab("s50 estimate")
   #To do: add RMSE, precision, accuracy as text boxes directly to plot
-
-# Check cumulative RMSE # 
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate))+
-  stat_ecdf(geom = "step")+
-  facet_grid(analysis~data)
 
 # Alternative plot: dot and whiskers #
 ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=id)) +
