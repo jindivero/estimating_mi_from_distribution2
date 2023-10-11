@@ -2,7 +2,7 @@
 install_local <- F
 library(devtools)
 
-if (install_local) devtools::install_local("/Users/juliaindivero/Library/CloudStorage/Dropbox/sdmTMB-mi.zip")
+if (install_local) devtools::install_local("/Users/juliaindivero/Library/CloudStorage/Dropbox/sdmTMB-newlogistic.zip")
 if (!install_local) remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE, ref="newlogistic")
 library(sdmTMB)
 
@@ -55,22 +55,23 @@ mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots = 250)
 init_vals <- get_inits()
 
 ### Plot data vs. depth and po2 ####
+plot <- F
+if(plot){
 ggplot(data = dat, aes(x = po2, y = -depth, col = log(cpue_kg_km2+1))) +
   geom_point() +
   scale_colour_viridis_c(limits = c(0, 6), oob = scales::squish) +
   xlim(c(0, 16))
+}
 
 ### Fit Breakpoint model to po2 ####
-seed <- sample(1:2000, 1)
+seed <- sample(1929)
 set.seed(seed)
 k_folds <- 5
 dat$fold_ids <- sample(seq_len(k_folds), nrow(dat), replace = TRUE)
 future::plan(future::multisession)
-#start <- init_vals$"Sebastolobus altivelis"$m1$start
-start <- init_vals$sablefish$m1$start
-#lower<- init_vals$"Sebastolobus altivelis"$m1$lower
-#upper <- init_vals$"Sebastolobus altivelis"$m1$upper
-m1 <- sdmTMB_cv(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
+start <- matrix(c(20, 1.1), ncol = 1L)
+
+m1 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 
              data = dat,
              time = NULL,
              reml = F,
@@ -78,14 +79,13 @@ m1 <- sdmTMB_cv(cpue_kg_km2 ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_s
              spatiotemporal = FALSE,
              mesh=mesh,
              family =tweedie(link="log"),
+            future_globals = c("start"),
              control = sdmTMBcontrol(
-               start = list(b_threshold = start),
-               #lower = list(b_threshold = lower), 
-               #upper = list(b_threshold = upper),
-               newton_loops = 2))
+               start = list(b_threshold = start)))
 
-summary(m1)
-AIC(m1)
+m1$models
+m1$sum_loglik
+m1$fold_loglik
 
 #### Plot fitted relationship ####
 
@@ -106,11 +106,11 @@ ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
 start <- init_vals$"Sebastolobus altivelis"$m2$start
-start <- init_vals$sablefish$m2$start
-lower <- init_vals$"Sebastolobus altivelis"$m2$lower
-upper <- init_vals$"Sebastolobus altivelis"$m2$upper
-
-m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
+start <- init_vals$"sablefish"$m2$start
+start <- matrix(c(1,1,1500,1), ncol = 1L)
+#lower <- init_vals$"Sebastolobus altivelis"$m2$lower
+#upper <- init_vals$"Sebastolobus altivelis"$m2$upper
+m2 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              time = NULL,
              reml = F,
@@ -118,12 +118,13 @@ m2 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scale
              spatiotemporal = FALSE,
              mesh=mesh,
              family =tweedie(link="log"),
+           future_globals = c("start"),
              control = sdmTMBcontrol(
-               start = list(b_threshold = start),
+              start = list(b_threshold = start)))
             #lower = list(b_threshold = lower),
-             # upper = list(b_threshold = upper),
-               newton_loops = 2,
-               nlminb_loops=2))
+             # upper = list(b_threshold = upper)
+               #newton_loops = 2,
+           #   nlminb_loops=2))
 
 summary(m2)
 AIC(m2)
@@ -152,7 +153,7 @@ start <- init_vals$sablefish$m2a$start
 
 prior <- normal(c(NA, NA, NA, 0.331), c(NA, NA, NA, 0.176))
 
-m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
+m2a <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
              time = NULL,
              reml = F,
@@ -161,8 +162,9 @@ m2a <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scal
              mesh=mesh,
              family =tweedie(link="log"),
              priors=sdmTMBpriors(threshold = prior),
+             future_globals = c("prior"),
              control = sdmTMBcontrol(
-               start = list(b_threshold = start),
+              # start = list(b_threshold = start),
             #   upper = list(b_threshold = upper),
              #  lower = list(b_threshold = lower),
                newton_loops = 2))
@@ -195,7 +197,7 @@ start <- init_vals$sablefish$m3$start
 upper <-  matrix(init_vals$sablefish$m3$upper)
 lower <- matrix(init_vals$sablefish$m3$lower)
 
-m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
+m3 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_scaled2,
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -203,6 +205,7 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
              reml=F,
              time=NULL,
              family =tweedie(link="log"),
+             future_globals = c("start"),
              control = sdmTMBcontrol(
                start = list(b_threshold=start),
              #  lower = list(b_threshold = lower),
@@ -211,7 +214,9 @@ m3 <- sdmTMB(cpue_kg_km2 ~ -1+year+logistic(po2_s)+log_depth_scaled+log_depth_sc
         )
 
 
-summary(m3)
+m3$models
+m3$sum_loglik
+m3$fold_loglik
 
 
 #### Plot fitted relationship ####
