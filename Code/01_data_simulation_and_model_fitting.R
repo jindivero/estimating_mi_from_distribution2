@@ -138,7 +138,7 @@ sim_test3 <- subset(sim_test, sim_test$mi_usual <s50)
 }
 
 #Save simulated data
-save <- F
+save <- T
 if(save){
 saveRDS(simdat, "data_sims_usual.rds")
 saveRDS(simdat2, "data_sims_weird.rds")
@@ -190,8 +190,8 @@ fits3 <- lapply(simdat2, run_sdmTMB_noprior,
 fits4 <- lapply(simdat2, run_sdmTMB_prior, 
                 start=start_unusual, mesh=mesh)
 }
-  m#Save models
-save <- F
+#Save models
+save <- T
 if(save){
 save(fits, fits2, fits3, fits4, file="model_fits.Rdata")
 }

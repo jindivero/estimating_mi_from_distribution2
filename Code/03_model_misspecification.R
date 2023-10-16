@@ -43,12 +43,11 @@ source("Code/sim_funs.R")
 #Load data and models if needed
 use_previous <- T
 if(use_previous){
-load("Model Outputs/model_fits.Rdata")
-simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
-simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
+  simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
+  simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
 }
 
-# Make list of parameter names
+# Set parameter values for data generation and model fitting #
 s50 <-2 # same as sablefish= 0.88; had been 2 in previous data simulation
 delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
 smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
@@ -66,42 +65,89 @@ sigma_O <- 1.77
 ## Set how many data sets to produce ##
 n <- 250
 
+## Make list of parameter values ##
+model.pars <- list(b_years = b_years,
+                   beta1 = beta1,
+                   beta2 = beta2,
+                   phi = phi,
+                   p = p,
+                   range = range,
+                   sigma_O=sigma_O)
+
+## Load data to make mesh ##
+sci_name <- "Anoplopoma fimbria" 
+spc <- "sablefish" 
+dat.by.size <- length_expand(sci_name)
+dat <- load_data(spc = spc, dat.by.size = dat.by.size)
+kelvin = 273.15
+boltz = 0.000086173324
+tref <- 12
+#Calculate inverse temp
+dat$invtemp <- (1 / boltz)  * ( 1 / (dat$temp + 273.15) - 1 / (tref + 273.15))
+#Calculate MI for usual case
+dat$mi_usual = dat$po2*exp(0.291* dat$invtemp)
+#Calculate MI for unusual case (99th percentile)
+dat$mi_weird = dat$po2*exp(0.733* dat$invtemp)
+#Scale and such
+dat$temp_s <- (scale(dat$temp))
+dat$po2_s <- (scale(dat$po2))
+dat$log_depth_scaled <- scale(log(dat$depth))
+dat$log_depth_scaled2 <- with(dat, log_depth_scaled ^ 2)
+dat$jday_scaled <- scale(dat$julian_day)
+dat$jday_scaled2 <- with(dat, jday_scaled ^ 2)
+dat$X <- dat$longitude
+dat$Y <- dat$latitude
+dat$cpue_kg_km2 <- dat$cpue_kg_km2 * (dat$p2+dat$p3)
+dat$year <- as.factor(dat$year)
+## Make mesh ##
+mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
+#Set starting values
+start <- matrix(0, ncol = 1, nrow = 4)
+start[1,1] <- s50
+start[2,1] <- delta
+start[3,1] <- smax
+start[4,1] <- Eo
+
+start_unusual <- start
+start_unusual[4,1] <- Eo2
+
+### Fit mis-specified depth model ###
+fits2_mis <- lapply(simdat, run_sdmTMB_prior_misspecified, 
+                    start=start, mesh=mesh)
+fits4_mis <- lapply(simdat2, run_sdmTMB_prior_misspecified, 
+                    start=start_unusual, mesh=mesh)
+
+save <- T
+if(save){
+  save(fits2_mis, fits4_mis, file="model_fits_mis.Rdata")
+}
+## Set how many data sets to produce ##
+n <- 250
+
 pars_names <- c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015")
 true_pars <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), 
                         estimate=c(beta1, beta2, delta, s50, smax, range, sigma_O, phi, p, Eo, b_years))
 true_pars2 <- data.frame(term=c("log_depth_scaled", "log_depth_scaled2", "mi-delta", "mi-s50", "mi-smax", "range", "sigma_O", "phi", "tweedie_p", "mi-Eo", "as.factor(year)2010","as.factor(year)2011","as.factor(year)2012", "as.factor(year)2013", "as.factor(year)2014", "as.factor(year)2015"), 
                          estimate=c(beta1, beta2, delta, s50, smax, range, sigma_O, phi, p, Eo2, b_years))
-# Set model names #
-model_names <- c("Typical Case, Unconstrained", "Typical Case, Prior Constrained", "Unusual Case, Unconstrained", "Unusual Case, Prior Constrained")
 
 ## Apply to model fits ##
 ## Parameter estimates ##
-pars1 <- lapply(fits, extract_pars)
-pars2 <- lapply(fits2, extract_pars)
-pars3 <-lapply(fits3, extract_pars)
-pars4 <- lapply(fits4, extract_pars)
+pars1 <- lapply(fits2_mis, extract_pars)
+pars2 <- lapply(fits4_mis, extract_pars)
 
-pars1 <- clean_pars(pars1, fits=fits)
-pars2 <- clean_pars(pars2, fits=fits2)
-pars3 <- clean_pars(pars3, fits=fits3)
-pars4 <- clean_pars(pars4, fits=fits4)
+pars1 <- clean_pars(pars1, fits=fits2_mis)
+pars2 <- clean_pars(pars2, fits=fits4_mis)
 
 #Add column to label model
-pars1$model <- model_names[1]
+pars1$model <- "Typical Case, Misspecified"
 pars1$data <- "Typical Case"
-pars1$analysis <- "Unconstrained"
-pars2$model <- model_names[2]
-pars2$data <- "Typical Case"
-pars2$analysis <- "Prior Constrained"
-pars3$model <- model_names[3]
-pars3$data <- "Unusual Case"
-pars3$analysis <- "Unconstrained"
-pars4$model <- model_names[4]
-pars4$data <- "Unusual Case"
-pars4$analysis <- "Prior Constrained"
+pars1$analysis <- "Misspecified"
+pars2$model <- "Unusual Case, Misspecified"
+pars2$data <- "Unusual Case"
+pars2$analysis <- "Misspecified"
 
 #Merge into one and combine
-pars <- rbind(pars1,pars2, pars3, pars4)
+pars <- rbind(pars1,pars2)
 
 ### Parameter performance measures ###
 ## Average ##
@@ -115,10 +161,10 @@ sd_avg <- aggregate(estimate ~ term+model, pars, FUN=stats::sd)
 pars$error <- case_when(pars$term=="mi-s50"~pars$estimate-s50,
                         pars$term=="mi-delta"~pars$estimate-delta,
                         pars$term=="mi-smax"~pars$estimate-smax,
-                        pars$term=="mi-Eo"& pars$model=="Typical Case, Unconstrained"~pars$estimate-Eo,
-                        pars$term=="mi-Eo"& pars$model=="Typical Case, Prior Constrained"~pars$estimate-Eo,
-                        pars$term=="mi-Eo"& pars$model=="Unusual Case, Unconstrained"~pars$estimate-Eo2,
-                        pars$term=="mi-Eo"& pars$model=="Unusual Case, Prior Constrained"~pars$estimate-Eo2,
+                        pars$term=="mi-Eo"& pars$model=="Typical Case, Misspecified"~pars$estimate-Eo,
+                       # pars$term=="mi-Eo"& pars$model=="Typical Case, Prior Constrained"~pars$estimate-Eo,
+                        pars$term=="mi-Eo"& pars$model=="Unusual Case, Misspecified"~pars$estimate-Eo2,
+                      #  pars$term=="mi-Eo"& pars$model=="Unusual Case, Prior Constrained"~pars$estimate-Eo2,
                         pars$term=="log_depth_scaled"~pars$estimate-beta1,
                         pars$term=="log_depth_scaled2"~pars$estimate-beta2,
                         pars$term=="range"~pars$estimate-range,
@@ -139,39 +185,54 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 
-#Cumulative RMSE for determining if enough simulations
-Eo_all <- subset(pars, term=="mi-s50")
-Eo_all1 <- subset(Eo_all, model=="Typical Case, Unconstrained")
-
-RMSE_sums <- matrix(nrow=250, ncol=1, NA)
-for(i in 1:nrow(Eo_all1)){
-  x <- Eo_all1[1:i,]
-  total <- sum(x$error2)
-  cum_rmse <- total/nrow(x)
-  RMSE_sums[i] <- cum_rmse
-}
-
-plot(RMSE_sums, type="b")
+## Root mean square error (accuracy) ##
+# Calculate error #
+pars$error <- case_when(pars$term=="mi-s50"~pars$estimate-s50,
+                        pars$term=="mi-delta"~pars$estimate-delta,
+                        pars$term=="mi-smax"~pars$estimate-smax,
+                        pars$term=="mi-Eo"& pars$model=="Typical Case, Misspecified"~pars$estimate-Eo,
+                       # pars$term=="mi-Eo"& pars$model=="Typical Case, Prior Constrained"~pars$estimate-Eo,
+                        pars$term=="mi-Eo"& pars$model=="Unusual Case, Misspecified"~pars$estimate-Eo2,
+                       # pars$term=="mi-Eo"& pars$model=="Unusual Case, Prior Constrained"~pars$estimate-Eo2,
+                        pars$term=="log_depth_scaled"~pars$estimate-beta1,
+                        pars$term=="log_depth_scaled2"~pars$estimate-beta2,
+                        pars$term=="range"~pars$estimate-range,
+                        pars$term=="sigma_O"~pars$estimate-sigma_O,
+                        pars$term=="phi"~pars$estimate-phi,
+                        pars$term=="tweedie_p"~pars$estimate-p,
+                        pars$term=="as.factor(year)2010"~pars$estimate-b_years[1],
+                        pars$term=="as.factor(year)2011"~pars$estimate-b_years[2],
+                        pars$term=="as.factor(year)2012"~pars$estimate-b_years[3],
+                        pars$term=="as.factor(year)2013"~pars$estimate-b_years[4],
+                        pars$term=="as.factor(year)2014"~pars$estimate-b_years[5],
+                        pars$term=="as.factor(year)2015"~pars$estimate-b_years[6])
+pars$error2 <- pars$error^2
+rmse <- aggregate(error2 ~ term+model, pars, FUN=sum)
+rmse2 <- aggregate(error2 ~ term+model, pars, FUN=length)
+rmse$n <- rmse2$error2
+rmse$rmse <- sqrt(rmse$error2/rmse$n)
+rmse$n <- NULL
+rmse$error2 <- NULL
 
 #Create dataframe for plotting
 
-Eo_values <- as.data.frame(matrix(nrow=4))
+Eo_values <- as.data.frame(matrix(nrow=2))
 Eo_values$V1 <- NULL
-Eo_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
-Eo_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
-Eo_values$model <- c("Typical Case, Prior Constrained", "Typical Case, Unconstrained","Unusual Case, Prior Constrained", "Unusual Case, Unconstrained")
+Eo_values$data <- c("Typical Case", "Unusual Case")
+Eo_values$analysis <- c( "Misspecified", "Misspecified")
+Eo_values$model <- c("Typical Case, Misspecified", "Unusual Case, Misspecified")
 MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-Eo"), FUN=mean)
 Eo_values$MLE_avg <- MLE_avg$estimate
-Eo_values$true <- c(Eo, Eo, Eo2, Eo2)
+Eo_values$true <- c(Eo, Eo2)
 
-s50_values <- as.data.frame(matrix(nrow=4))
+s50_values <- as.data.frame(matrix(nrow=2))
 s50_values$V1 <- NULL
-s50_values$data <- c("Typical Case", "Typical Case", "Unusual Case", "Unusual Case")
-s50_values$analysis <- c( "Prior Constrained", "Unconstrained", "Prior Constrained", "Unconstrained")
-s50_values$model <- c("Typical Case, Prior Constrained", "Typical Case, Unconstrained","Unusual Case, Prior Constrained", "Unusual Case, Unconstrained")
+s50_values$data <- c("Typical Case", "Unusual Case")
+s50_values$analysis <- c( "Misspecified", "Misspecified")
+s50_values$model <- c("Typical Case, Misspecified", "Unusual Case, Misspecified")
 MLE_avg <- aggregate(estimate~model, subset(pars, term=="mi-s50"), FUN=mean)
 s50_values$MLE_avg <- MLE_avg$estimate
-s50_values$true <- c(s50, s50,s50,s50)
+s50_values$true <- c(s50, s50)
 
 ## Make a table ##
 rmse$"average" <- avg$estimate
@@ -182,10 +243,10 @@ colnames(par_performance) <- c("Parameter", "Model", "RMSE", "Average", "Precisi
 par_performance$Bias <- case_when(par_performance$Parameter=="mi-s50"~par_performance$Average-s50,
                                   par_performance$Parameter=="mi-delta"~par_performance$Average-delta,
                                   par_performance$Parameter=="mi-smax"~par_performance$Average-smax,
-                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Unconstrained"~par_performance$Average-Eo,
-                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Prior Constrained"~par_performance$Average-Eo,
-                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Unconstrained"~par_performance$Average-Eo2,
-                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Prior Constrained"~par_performance$Average-Eo2,
+                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Misspecified"~par_performance$Average-Eo,
+                                 # par_performance$Parameter=="mi-Eo"& par_performance$Model=="Typical Case, Prior Constrained"~par_performance$Average-Eo,
+                                  par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Misspecified"~par_performance$Average-Eo2,
+                                  #par_performance$Parameter=="mi-Eo"& par_performance$Model=="Unusual Case, Prior Constrained"~par_performance$Average-Eo2,
                                   par_performance$Parameter=="log_depth_scaled"~par_performance$Average-beta1,
                                   par_performance$Parameter=="log_depth_scaled2"~par_performance$Average-beta2,
                                   par_performance$Parameter=="range"~par_performance$Average-range,
@@ -203,9 +264,6 @@ Eo_performance <- subset(par_performance, Parameter=="mi-Eo")
 s50_performance <- subset(par_performance, Parameter=="mi-s50")
 
 ### Plot parameter estimates ###
-# Reorder
-pars$analysis <- factor(pars$analysis, levels = c("Unconstrained", "Prior Constrained"))
-Eo_values$analysis <- factor(Eo_values$analysis, levels = c("Unconstrained", "Prior Constrained"))
 #Density plot just Eo #
 ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
@@ -227,36 +285,7 @@ ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed")+
   ylab("Density of data simulations")
 
-##Plot separately and combine
-p1 <- ggplot(subset(pars, pars$term=="mi-Eo"&pars$analysis=="Unconstrained"), aes(x=estimate)) +
-  geom_density(fill="lightblue", adjust = 1.5) +
-  geom_vline(data=subset(Eo_values, Eo_values$analysis=="Unconstrained"), aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
-  geom_vline(data=subset(Eo_values, Eo_values$analysis=="Unconstrained"), aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
-  scale_y_continuous(limits=c(0,6))+
-  scale_x_continuous(limits=c(-0.7,1.4))+
-  theme(axis.title.y=element_blank(), axis.title.x=element_blank())
-
-p2 <- ggplot(subset(pars, pars$term=="mi-Eo"&pars$analysis=="Prior Constrained"), aes(x=estimate)) +
-  geom_density(fill="lightblue", adjust = 1.5) +
-  geom_vline(data=subset(Eo_values, Eo_values$analysis=="Prior Constrained"), aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
-  geom_vline(data=subset(Eo_values, Eo_values$analysis=="Prior Constrained"), aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
-  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed", geom="area", alpha=0.2)+
-  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed")+
-  scale_y_continuous(limits=c(0,6))+
-  scale_x_continuous(limits=c(-0.7,1.4))+
-  theme(strip.text.x.top = element_blank(), axis.title.y=element_blank())+
-  xlab(expression(E[0]~Maximum~Likelihood~Estimate))
-
-figure <- ggarrange(p1, p2, 
-          ncol = 1, nrow = 2)
-
-annotate_figure(figure, left=text_grob("Density of iterations", size=30, rot=90))
-
 # Density plot s50 #
-#Reorder 
-s50_values$analysis <- factor(s50_values$analysis, levels = c("Unconstrained", "Prior Constrained"))
 ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
   geom_vline(data = s50_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
@@ -264,52 +293,18 @@ ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   facet_grid(analysis~data)+
   xlab("s50 Maximum Likelihood Estimate")+
   ylab("Density of iterations")
-  #To do: add RMSE, precision, accuracy as text boxes directly to plot
-
-# Alternative plot: dot and whiskers #
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=id)) +
-  geom_errorbar(aes(ymin = conf.low, ymax =conf.high)) +  
-  geom_point(aes(y=estimate))+
-  facet_grid(analysis~data)+
-  ylab("Eo estimate")+
-  xlab("Simulation")+
-  theme(axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())+
-  geom_hline(data = Eo_values, aes(yintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
-  geom_hline(data = Eo_values, aes(yintercept = true),linetype="dashed", size=1.2)
-  
-ggplot(subset(pars, pars$term=="mi-s50"), aes(x=id)) +
-  geom_errorbar(aes(ymin = conf.low, ymax =conf.high)) +  
-  geom_point(aes(y=estimate))+
-  facet_grid(analysis~data)+
-  ylab("s50 estimate") + 
-  geom_density(fill="lightblue", adjust = 1.5) +
-  geom_vline(data = s50_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
-  geom_vline(data = s50_values, aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
-  xlab("s50 estimate") + 
-  theme(strip.text = element_text(size = 14))
-
-# To Do: Supplemental figures: other parameters # 
-
-#Plot accuracy and precision
-ggplot(data=Eo_performance, aes(x=Precision, y=Bias))+geom_point(aes(group=Model,color=Model), size=5)
 
 #### Comparing po2' effect from parameter estimates ####
 #calculate the po2' estimated from the Eo, use that to calculate f(po2')
-simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits, SIMPLIFY=F)
-simdats2 <- mapply(FUN=calculate_po2_prime, simdat,fits2, SIMPLIFY=F)
-simdats3 <- mapply(FUN=calculate_po2_prime, simdat2,fits3, SIMPLIFY=F)
-simdats4 <- mapply(FUN=calculate_po2_prime, simdat2,fits4, SIMPLIFY=F)
+simdats1 <- mapply(FUN=calculate_po2_prime, simdat,fits2_mis, SIMPLIFY=F)
+simdats2 <- mapply(FUN=calculate_po2_prime, simdat2,fits4_mis, SIMPLIFY=F)
 
 #plot true po2 vs exp(f(po2'estimated) (either as points or lines)
-simdats1 <- mapply(FUN=logfun2, simdats1,"po2_prime", fits, SIMPLIFY=F)
-simdats2 <- mapply(FUN=logfun2, simdats2,"po2_prime", fits2, SIMPLIFY=F)
-simdats3 <- mapply(FUN=logfun2, simdats3,"po2_prime", fits3, SIMPLIFY=F)
-simdats4 <- mapply(FUN=logfun2, simdats4,"po2_prime", fits4, SIMPLIFY=F)
+simdats1 <- mapply(FUN=logfun2, simdats1,"po2_prime", fits2_mis, SIMPLIFY=F)
+simdats2 <- mapply(FUN=logfun2, simdats2,"po2_prime", fits4_mis, SIMPLIFY=F)
 
 #Calculate true po2' effect
-dat <- simdats1[[1]]
+dat <- simdats1[[3]]
 true_effect <- as.data.frame(logfun_basic(dat$mi_usual, smax, s50, delta))
 true_effect2<- as.data.frame(logfun_basic(dat$mi_weird, smax, s50, delta))
 colnames(true_effect) <- "mi_effect"
@@ -322,14 +317,9 @@ simdats1 <- keep(.x=simdats1, .p=is.data.frame)
 simdats1 <- bind_rows(simdats1, .id="df")
 simdats2 <- keep(.x=simdats2, .p=is.data.frame)
 simdats2 <- bind_rows(simdats2, .id="df")
-simdats3<- keep(.x=simdats3, .p=is.data.frame)
-simdats3 <- bind_rows(simdats3, .id="df")
-simdats4 <- keep(.x=simdats4, .p=is.data.frame)
-simdats4 <- bind_rows(simdats4, .id="df")
 simdats1$title <- "Typical Case"
-simdats3$title <- "Unusual Case"
-simdats3$side <- "Unconstrained"
-simdats4$side <- "Prior Constrained"
+simdats2$title <- "Unusual Case"
+simdats2$side <- "Misspecified"
 
 q1 <- ggplot(simdats1, aes(mi_usual, logmu, colour=Eo)) +
   geom_point(size=0.1)+
@@ -338,45 +328,27 @@ q1 <- ggplot(simdats1, aes(mi_usual, logmu, colour=Eo)) +
   ylab("Estimated pO2' effect")+
   theme(legend.position=c(0.9,0.2))+
   geom_line(data=true_effect, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank())+
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())+
   facet_wrap("title")
-q2 <- ggplot(simdats2, aes(mi_usual, logmu, colour=Eo)) +
+q2 <- ggplot(simdats2, aes(mi_weird, logmu, colour=Eo)) +
   geom_point(size=0.1)+
   scale_colour_viridis()+
   xlab("True pO2'")+
   ylab("Estimated pO2' effect")+
   theme(legend.position=c(0.9,0.2))+
   geom_line(data=true_effect, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank())
-q3 <- ggplot(simdats3, aes(mi_weird, logmu, colour=Eo)) +
-  geom_point(size=0.1)+
-  scale_colour_viridis()+
-  xlab("True pO2'")+
-  ylab("Estimated pO2' effect")+
-  theme(legend.position=c(0.9,0.2))+
-  geom_line(data=true_effect2, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank(), axis.text=element_blank())+
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())+
   facet_grid(side~title)
-q4 <- ggplot(simdats4, aes(mi_weird, logmu, colour=Eo)) +
-  geom_point(size=0.1)+
-  scale_colour_viridis()+
-  xlab("True pO2'")+
-  ylab("Estimated pO2' effect")+
-  theme(legend.position=c(0.9,0.2))+
-  geom_line(data=true_effect2, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank(), axis.text.y=element_blank())+
-  facet_wrap("side", strip.position="right")
 
-figure2 <- ggarrange(q1, q3,q2,q4,
-  common.legend = TRUE, legend = "right")
+
+figure2 <- ggarrange(q1,q2,
+                     common.legend = TRUE, legend = "right")
 
 annotate_figure(figure2, left=text_grob(expression(paste("pO"[2], "'", " Effect")), size=30, rot=90),bottom=text_grob(expression(paste("pO"[2], "'", " True Value")), size=30))
 
 ###Calculate RMSE ####
 simdats1$true <- true_effect$mi_effect
-simdats2$true <- true_effect$mi_effect
-simdats3$true <- true_effect2$mi_effect
-simdats4$true <- true_effect2$mi_effect
+simdats2$true <- true_effect2$mi_effect
 
 simdats1$error <- simdats1$logmu-simdats1$true
 simdats1$error2 <- simdats1$error^2
@@ -398,32 +370,4 @@ rmse$n <- NULL
 rmse$error2 <- NULL
 rmse2a <- mean(rmse$rmse)
 
-simdats3$error <- simdats3$logmu-simdats3$true
-simdats3$error2 <- simdats3$error^2
-rmse <- aggregate(error2 ~ df, simdats3, FUN=sum)
-rmse2 <- aggregate(error2 ~ df, simdats3, FUN=length)
-rmse$n <- rmse2$error2
-rmse$rmse <- sqrt(rmse$error2/rmse$n)
-rmse$n <- NULL
-rmse$error2 <- NULL
-rmse3 <- mean(rmse$rmse)
 
-simdats4$error <- simdats4$logmu-simdats4$true
-simdats4$error2 <- simdats4$error^2
-rmse <- aggregate(error2 ~ df, simdats4, FUN=sum)
-rmse2 <- aggregate(error2 ~ df, simdats4, FUN=length)
-rmse$n <- rmse2$error2
-rmse$rmse <- sqrt(rmse$error2/rmse$n)
-rmse$n <- NULL
-rmse$error2 <- NULL
-rmse4 <- mean(rmse$rmse)
-
-#### Covariance of parameters
-## Make dataframe of all parameter estimates wide ##
-pars_wide <- pivot_wider(pars, id_cols=c(id, model), names_from=term, values_from=estimate)
-## Plot Eo vs s50 ##
-ggplot(pars_wide, aes(x=pars_wide$"mi-Eo", y=pars_wide$"mi-s50"))+ geom_point(aes(group=model, color=model), size=5)+xlab("Eo estimate")+ylab("s50 estimate")+
-  theme(legend.position=c(0.3,0.8))
-#Just typical case, prior constrained
-pars_wide2 <- subset(pars_wide, model=="Typical Case, Prior Constrained")
-ggplot(pars_wide2, aes(x=pars_wide2$"mi-Eo", y=pars_wide2$"mi-s50"))+xlab("Eo estimate")+ylab("s50 estimate")+stat_density2d(aes(fill = stat(level)), geom = "polygon")+ geom_point(size=5)

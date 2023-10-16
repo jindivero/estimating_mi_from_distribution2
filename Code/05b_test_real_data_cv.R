@@ -66,7 +66,7 @@ ggplot(data = dat, aes(x = po2, y = -depth, col = log(cpue_kg_km2+1))) +
 ### Fit Breakpoint model to po2 ####
 seed <- sample(1929)
 set.seed(seed)
-k_folds <- 5
+k_folds <- 10
 dat$fold_ids <- sample(seq_len(k_folds), nrow(dat), replace = TRUE)
 future::plan(future::multisession)
 start <- matrix(c(20, 1.1), ncol = 1L)
@@ -105,9 +105,7 @@ ggplot(dat, aes(x = po2, y = thresh_pred, col = log(cpue_kg_km2 + 1))) +
 
 ### Fit Eo estimation - po2 prime model ####
 #Set starting parameters: 
-start <- init_vals$"Sebastolobus altivelis"$m2$start
 start <- init_vals$"sablefish"$m2$start
-start <- matrix(c(1,1,1500,1), ncol = 1L)
 #lower <- init_vals$"Sebastolobus altivelis"$m2$lower
 #upper <- init_vals$"Sebastolobus altivelis"$m2$upper
 m2 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
@@ -120,14 +118,15 @@ m2 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_sc
              family =tweedie(link="log"),
            future_globals = c("start"),
              control = sdmTMBcontrol(
-              start = list(b_threshold = start)))
+              start = list(b_threshold = start),
             #lower = list(b_threshold = lower),
              # upper = list(b_threshold = upper)
-               #newton_loops = 2,
-           #   nlminb_loops=2))
+               newton_loops = 2,
+           nlminb_loops=2))
 
-summary(m2)
-AIC(m2)
+m2$models
+m2$sum_loglik
+m2$fold_loglik
 
 #### Plot fitted relationshop ####
 ##### extract estimates ####
@@ -143,8 +142,6 @@ ggplot(dat, aes(x = po2_prime, y = Eo_unconstrained, col = log(cpue_kg_km2 + 1))
   xlim(c(0,5))+
   ylab("Marginal Effect")
   
-
-
 ### Fit Eo estimation - po2 prime model (with prior) ####
 ## Set starting parameters:
 
@@ -162,15 +159,15 @@ m2a <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+logistic(mi)+log_depth_scaled+log_depth_s
              mesh=mesh,
              family =tweedie(link="log"),
              priors=sdmTMBpriors(threshold = prior),
-             future_globals = c("prior"),
+             future_globals = c("prior", "start"),
              control = sdmTMBcontrol(
-              # start = list(b_threshold = start),
+              start = list(b_threshold = start),
             #   upper = list(b_threshold = upper),
              #  lower = list(b_threshold = lower),
-               newton_loops = 2))
-
-summary(m2a)
-AIC(m2a)
+               newton_loops = 3))
+m2a$models
+m2a$sum_loglik
+m2a$fold_loglik
 
 #### Plot fitted relationship ####
 ##### extract estimates ####
@@ -230,42 +227,46 @@ ggplot(dat, aes(x = po2, y = logistic_pos, col = log(cpue_kg_km2 + 1))) +
   ylab("Marginal Effect")
 
 ### Fit null model ####
-m4 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
+m4 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2, 
              data = dat, 
              spatial = "on",
              mesh=mesh,
              anisotropy=T,
              reml=F,
              time=NULL,
+             future_globals = c("start"),
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                newton_loops = 2,
                )
              )
-summary(m4)
-AIC(m4)
+m34models
+m4sum_loglik
+m4$fold_loglik
 
 ### Fit other alternative models ###
 ## Temperature ##
 
-m5 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
+m5 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s,
              data = dat, 
              spatial = "on",
              mesh=mesh,
              anisotropy=T,
              reml=F,
              time=NULL,
+             future_globals = c("start"),
              family =tweedie(link="log"),
              control = sdmTMBcontrol(
                newton_loops = 1,
              )
 )
 
-summary(m5)
-AIC(m5)
+m5$models
+m5$sum_loglik
+m5$fold_loglik
 
 ##Oxygen only##
-m6 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
+m6 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -277,11 +278,12 @@ m6 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+po2_s,
              )
 )
 
-summary(m6)
-AIC(m6)
+m6$models
+m6$sum_loglik
+m6$fold_loglik
 
 ## Temp and o2 ##
-m7 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
+m7 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + po2_s,
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -293,11 +295,12 @@ m7 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s + p
              )
 )
 
-summary(m7)
-AIC(m7)
+m7$models
+m7$sum_loglik
+m7$fold_loglik
 
 ##Temp and o2 interaction ##
-m8 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
+m8 <- sdmTMB_cv(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * po2_s,
              data = dat, 
              spatial = "on",
              mesh=mesh,
@@ -309,26 +312,26 @@ m8 <- sdmTMB(cpue_kg_km2 ~ -1+year+log_depth_scaled+log_depth_scaled2+temp_s * p
              )
 )
 
-summary(m8)
-AIC(m8)
-
+m8$models
+m8$sum_loglik
+m8$fold_loglik
 
 ### Create dAIC table ###
 ## Make list of model names##
 models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
 ## Create table and add AIC for each ##
-AIC <- as.data.frame(matrix(NA, ncol = 1, nrow =length(models), dimnames = list(models)))
-AIC[1,] <- AIC(m1)
-AIC[2,] <- AIC(m2a)
-AIC[3,] <- AIC(m3)
-AIC[4,] <- AIC(m4)
-AIC[5,] <- AIC(m5)
-AIC[6,] <- AIC(m6)
-AIC[7,] <- AIC(m7)
-AIC[8,] <- AIC(m8)
+compare<- as.data.frame(matrix(NA, ncol = 1, nrow =length(models), dimnames = list(models)))
+compare[1,] <- m1$elpd
+compare[2,] <- m2a$elpd
+compare[3,] <- m3$elpd
+compare[4,] <- m4$elpd
+compare[5,] <- m5$elpd
+compare[6,] <- m6$elpd
+compare[7,] <- m7$elpd
+compare[8,] <- m8$elpd
 
 ## Calculate delta-AIC ##
-AIC$dAIC <- abs(min(AIC$V1)-(AIC$V1))
+AIC$elpd <- abs(min(AIC$V1)-(AIC$V1))
 
 #### Plot marginal effects w/ +- SE using Tim's sdm_o2 code
 ## Breakpoint ##
