@@ -353,10 +353,10 @@ run_alt_models_mis <- function(dat, start, mesh) {
   try(return(AIC))
 }
 ### Run alternative models for each data simulation ###
-run_alt_models_cv <- function(dat, start, mesh) {
-  seed <- sample(1:2000, 1)
+run_alt_models_cv <- function(dat, start, mesh, n_folds) {
+  seed <- sample(1929)
   set.seed(seed)
-  k_folds <- 5
+  k_folds <- n_folds
   dat$fold_ids <- sample(seq_len(k_folds), nrow(dat), replace = TRUE)
   future::plan(future::multisession)
   m1 <- try(sdmTMB_cv(sim ~ 1+year+breakpt(po2_s)+log_depth_scaled+log_depth_scaled2, 

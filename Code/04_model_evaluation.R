@@ -13,13 +13,8 @@ source("Code/sim_funs.R")
 
 use_previous <- T
 if(use_previous==T){
-  load("model_fits.Rdata")
-  load("model_fits_mis.Rdata")
-  load("model_fits_ran.Rdata")
-}
-if(use_previous==T){
-  load("data_sims_usual_ran.rds")
-  load("data_sims_weird_ran.rds")
+  simdat <- readRDS("Model Outputs/data_sims_usual.rds")
+  simdat2 <- readRDS("Model Outputs/data_sims_weird.rds")
 }
 
 #Load data, start, mesh
