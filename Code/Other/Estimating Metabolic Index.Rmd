@@ -1,0 +1,120 @@
+---
+title: "Metabolic Index Threshold Estimation Option"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{Metabolic Index Threshold Estimation Option}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  echo = FALSE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+This vignette is to provide guidance on using an optional estimation feature developed and used in Indivero et al. (in prep). This feature is specifically designed for using spatial data on oxygen, temperature, and fish catch to estimate 1) the metabolic index and 2) a threshold function of the effect of the metabolic index on fish density within the estimation model of a generalized linear mixed model, i.e. simultaneously estimating over covariates, spatial random variation, etc. For further detail on the metabolic index and the form of the threshold function, see Indivero et al. 
+
+## Data Inputs
+This model feature requires three columns in the dataset (in addition to latitude and longitude): 
+*1) **species density** (e.g. catch-per-unit-effort, or other response variable) (column can be named anything)
+*2) **oxygen** (must be in kiloPascals (kPa), and column must be named *po2*
+*3) **temperature** (must be in inverse temperature and Kelvin, see below) and column must be named *invtemp*. 
+
+Any additional time variable or environmental covariates can be included in the data at the same coordinates as the catch, temperature, and oxygen data.
+
+#Oxygen: 
+Oxygen needs to be in kPa. Below is an example of how to convert dissolved oxygen in milliliter per liter (mL/L) to kPa. Converting from mL/L to kPa also requires ocean temperature (in Celsius) and Salinity (in pss-78).
+```{r oxygen, echo=FALSE}
+  #Define constants
+  gas_const = 8.31
+  partial_molar_vol = 0.000032
+  kelvin = 273.15
+  boltz = 0.000086173324
+  #Calculate percent saturation for O2. This assumes  units of mL O2/L.
+  # Input:       S = Salinity (pss-78)
+  #              T = Temp (deg C) ! use potential temp
+  #depth is in meters
+  #[umole/kg] = [ml/L]*44660/(sigmatheta(P=0,theta,S) + 1000)
+  dat$SA = gsw_SA_from_SP(dat$sal,dat$depth,dat$longitude_dd,dat$latitude_dd) #absolute salinity for pot T calc
+  dat$pt = gsw_pt_from_t(dat$SA,dat$temp,dat$depth) #potential temp at a particular depth
+  dat$CT = gsw_CT_from_t(dat$SA,dat$temp,dat$depth) #conservative temp
+  dat$sigma0 = gsw_sigma0(dat$SA,dat$CT)
+  dat$o2_umolkg = dat$o2*44660/(dat$sigma0+1000)
+  
+  #Calculate solubility
+  pt68 = dat$pt*1.00024
+  y = log((298.15 - pt68)/(273.15 + pt68))
+  
+  a0 =  5.80871
+  a1 =  3.20291
+  a2 =  4.17887
+  a3 =  5.10006
+  a4 = -9.86643e-2
+  a5 =  3.80369
+  b0 = -7.01577e-3
+  b1 = -7.70028e-3
+  b2 = -1.13864e-2
+  b3 = -9.51519e-3
+  c0 = -2.75915e-7
+  
+  dat$O2_Sat0 = exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
+  
+  #= o2satv2a(sal,pt) #uses practical salinity and potential temp - solubity at p =1 atm
+  dat$press = exp(dat$depth*10000*partial_molar_vol/gas_const/(dat$temp+kelvin))
+  dat$O2_satdepth = dat$O2_Sat0*dat$press
+  
+  #solubility at p=0
+  dat$sol0 = dat$O2_Sat0/0.209
+  dat$sol_Dep = dat$sol0*dat$press
+  dat$po2 = dat$o2_umolkg/dat$sol_Dep
+  dat$po2 <- dat$po2 * 101.325 # convert to kPa
+```
+# Inverse temperature
+
+```{r inverse temperature, echo=FALSE}
+### Set up environmental data ###
+kelvin = 273.15
+boltz = 0.000086173324
+tref <- 12
+#Calculate inverse temp
+dat$invtemp <- (1 / boltz)  * ( 1 / (dat$temp + 273.15) - 1 / (tref + 273.15))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Model Estimation
+The Metabolic Index estimation is implemented using the standard sdmTMB() function in sdmTMB, and adding +mi() to the model equation. can be added in combination with most other model structure options in sdmTMB. It can be used with or without temporal, spatial, and spatio-temproal variation, and with other fixed effects in the model equation. However, it curr
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+# Estimation Troubleshooting
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+## Interpreting Model Output
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
