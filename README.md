@@ -2,7 +2,7 @@
 ## Purpose
 This vignette is to provide guidance on using an optional estimation feature +logistic(mi) added to model equation using  sdmTMB() developed and used in Indivero et al. (in prep). This feature is specifically designed for using spatial data on oxygen, temperature, and marine species density to estimate both:
 
-1. The metabolic index, with an estimated parameter $\E_o$
+1. The metabolic index, with an estimated parameter Eo
 2. A threshold function of the effect of the metabolic index on fish density (with estimated parameters $s50$, $s95$, and scaling parameter $\psi$ (called "smax" in sdmTMB)) 
 all within the estimation model of a generalized linear mixed model, i.e. simultaneously estimating over covariates, spatial random variation, etc. 
 
