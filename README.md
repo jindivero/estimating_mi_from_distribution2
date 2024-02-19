@@ -96,7 +96,7 @@ Note that there are four estimated parameters of the metabolic index threshold f
 ```
 
 ### Add a prior
-A prior can be added using priors=sdmTMBpriors(threshold=). Here, we will add a prior on $E_0_$ only.
+A prior can be added using priors=sdmTMBpriors(threshold=). Here, we will add a prior on Eo only.
 
 ```{r prior, echo=TRUE}
 fit <- sdmTMB(cpue_kg_km2 ~ -1+as.factor(year)+logistic(mi)+log_depth_scaled+log_depth_scaled2, 
