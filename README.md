@@ -118,7 +118,7 @@ Standard wrapper functions can be used to evaluate the model fit. The parameters
 
 NOTE: The "s95" parameter value reported is actually a delta value (difference between s95 and s50). To calculate the value of s95 itself (i.e. the value of the metabolic index at which the logged response on fish is a 95% reduction on density), add the reported values of s50+s95.
 
-```{r interpret, echo=TRUE, include=TRUE}
+```{r interpret, echo=TRUE, include=TRUE, eval=TRUE}
 #View parameter estimates
   summary(fit)
 
@@ -131,7 +131,7 @@ NOTE: The "s95" parameter value reported is actually a delta value (difference b
 We can pull out the parameter estimates for the metabolic index threshold feature to calculate the metabolic index from observed temperature and oxygen and the marginal effect of the metabolic index on fish density.
 
 To evaluate how the response is impacted across the range of estimated Eo values (e.g. the 95% confidence interval of the maximum likelihood estimate), the lower and upper interval values can be used in the equations.
-```{r marginal effect, echo=TRUE, include=TRUE}
+```{r marginal effect, echo=TRUE, include=TRUE, eval=TRUE}
 ## Extract parameters
   #Using tidy
     par_estimates <- as.data.frame(tidy(fit, conf.int = TRUE, effects="fixed"))
@@ -167,7 +167,7 @@ ggplot(dat, aes(x=metabolic_index, y=effect))+geom_point()
 ### Threshold oxygen level across temperatures
 The parameter estimates can also be used to calculate the values of oxygen across a range of temperatures that correspond to the limiting metabolic index threshold (either s50 or s95).
 
-```{r threshold, echo=TRUE, include=TRUE}
+```{r threshold, echo=TRUE, include=TRUE, eval=TRUE}
 #For the s50 threshold
 dat$po2_s50 <- s50/exp(Eo*dat$invtemp)
 #For the s95 threshold
