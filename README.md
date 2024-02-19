@@ -1,28 +1,3 @@
----
-title: "Metabolic Index Threshold Estimation Feature"
-output:
-  rmarkdown::html_vignette:
-    toc: true
-    toc_depth: 2
-vignette: >
-  %\VignetteIndexEntry{Metabolic Index Threshold Estimation Option}
-  %\VignetteEncoding{UTF-8}
-  %\VignetteEngine{knitr::rmarkdown}
-editor_options: 
-  markdown: 
-    wrap: sentence
----
-
-```{r setup, echo=FALSE, cache=FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  echo = FALSE,
-  error = FALSE,
-  message = FALSE,
-  warning = FALSE
-)
-```
 
 ## Purpose
 This vignette is to provide guidance on using an optional estimation feature +logistic(mi) added to model equation using  sdmTMB() developed and used in Indivero et al. (in prep). This feature is specifically designed for using spatial data on oxygen, temperature, and marine species density to estimate both:
