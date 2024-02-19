@@ -1,3 +1,5 @@
+library(knitr)
+opts_chunk$set(dev="png")
 
 ## Purpose
 This vignette is to provide guidance on using an optional estimation feature +logistic(mi) added to model equation using  sdmTMB() developed and used in Indivero et al. (in prep). This feature is specifically designed for using spatial data on oxygen, temperature, and marine species density to estimate both:
