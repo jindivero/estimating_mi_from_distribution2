@@ -509,3 +509,364 @@ diagnostics <- bind_rows(diagnostics, grads1, NAs)
 
 # Average standard error (precision)--also to compare to SD of prior #
 #std_error_within_model <- aggregate(std.error ~ term+model, pars, FUN=mean) 
+
+### Impact on predictions: Evaluate impact of different combos on the limiting value of oxygen at each temperature, and then if temperatures increased
+##Choose three representative parameter combos (highest and lowest Eo)
+predict1 <- pars_wide2[which.max(pars_wide2$"mi-Eo"),]
+predict2 <- pars_wide2[which.min(pars_wide2$"mi-Eo"),]
+predict3 <- subset(pars_wide2, pars_wide2$"mi-Eo">0)
+predict3 <- pars_wide2[which.min(predict3$"mi-Eo"),]
+
+##Impact on critical pO2 level
+#Pull out the Eo and s50 parameters
+s50_1 <- as.numeric(predict1[,c("mi-s50")])
+Eo_1 <- as.numeric(predict1[,c("mi-Eo")])
+delta_1 <- as.numeric(predict1[,c("mi-delta")])
+smax_1 <- as.numeric(predict1[,c("mi-smax")])
+s50_2 <- as.numeric(predict2[,c("mi-s50")])
+Eo_2 <- as.numeric(predict2[,c("mi-Eo")])
+delta_2 <- as.numeric(predict2[,c("mi-delta")])
+smax_2 <- as.numeric(predict2[,c("mi-smax")])
+s50_3 <- as.numeric(predict3[,c("mi-s50")])
+Eo_3 <- as.numeric(predict3[,c("mi-Eo")])
+delta_3 <- as.numeric(predict3[,c("mi-delta")])
+smax_3 <- as.numeric(predict3[,c("mi-smax")])
+
+#Calculate po2-crit for each (with observed data)
+dat$po2_1 <- s50_1/exp(Eo_1*dat$invtemp)
+dat$po2_2 <- s50_2/exp(Eo_2*dat$invtemp)
+dat$po2_3 <- s50_3/exp(Eo_3*dat$invtemp)
+
+
+#Increase the temperature 2 degrees
+kelvin = 273.15
+boltz = 0.000086173324
+tref <- 12
+dat$invtemp2 <- (1 / boltz)  * ( 1 / ((dat$temp+2) + 273.15) - 1 / (tref + 273.15))
+#Re-calculate critical pO2 values
+dat$po2_2a <- 2/exp(Eo_2*dat$invtemp2)
+dat$po2_3a <- 2/exp(Eo_3*dat$invtemp2)
+dat$pO2_s50_predict <- 2/exp(0.3*dat$invtemp2)
+dat$po2_2b <- s50_2/exp(0.3*dat$invtemp2)
+dat$po2_3b <- s50_3/exp(0.3*dat$invtemp2)
+
+#Plot
+p1 <- ggplot(dat, aes(x=temp+2, y=po2_1a))+
+  #geom_line(color="grey", size=2)+
+  geom_line(aes(x=temp+2, y=po2_2a),colour="gold",  size=2)+
+  geom_line(aes(x=temp+2, y=po2_3a), colour="purple4",  size=2)+
+  geom_line(aes(x=temp+2, y=pO2_s50_predict), linetype="dashed",  size=2)+
+  geom_line(aes(x=temp+2, y=po2_2b),colour="yellow",  size=2)+
+  geom_line(aes(x=temp+2, y=po2_3b), colour="purple",  size=2)+
+  xlab("Temperature (C)")+
+  ylab((expression("Oxygen (kPa) at"~phi["eco,s50"])))+
+  annotate("text", label=bquote(Low~E[0]), size = 10, x =17, y = 1)+
+  annotate("text", label=bquote(High~E[0]), size = 10, x = 17, y =1.5)
+
+p1 <- ggplot(dat, aes(x=temp+2, y=po2_2a))+
+  geom_line(color="purple", size=2)+
+  geom_line(aes(x=temp+2, y=po2_3a), colour="purple4",  size=2)+
+  geom_line(aes(x=temp+2, y=pO2_s50_predict), linetype="dashed",  size=2)+
+  geom_line(aes(x=temp+2, y=po2_2b),colour="gold",  size=2)+
+  geom_line(aes(x=temp+2, y=po2_3b), colour="gold3",  size=2)+
+  xlab("Temperature (C)")+
+  ylab((expression("Oxygen (kPa) at"~phi["eco,s50"])))+
+  annotate("text", label=bquote(Low~E[0]), size = 10, x =17, y = 1)+
+  annotate("text", label=bquote(High~E[0]), size = 10, x = 17, y =1.5)
+
+ggplot(preds, aes(x=temp, y=logmu1b))+geom_line(colour="purple", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu1c),colour="purple4", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2b),colour="gold",size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2c),colour="gold3", size=1.5)+
+  geom_line(aes(x=temp, y=logtrue), linetype="dashed",  size=2)+
+  xlab("Temperature (C)")+
+  
+  ggsave(
+    "figure_temp_po2crit.png",
+    plot = last_plot(),
+    device = NULL,
+    path = NULL,
+    scale = 1,
+    width = 8,
+    height =6,
+    units = c("in"),
+    dpi = 600,
+    limitsize = TRUE
+  )
+
+#Only changing one parameter
+dat$po2_2a <- 2/exp(Eo_2*dat$invtemp2)
+dat$po2_3a <- 2/exp(Eo_3*dat$invtemp2)
+dat$pO2_s50_predict <- 2/exp(0.3*dat$invtemp2)
+dat$po2_2b <- 1.2/exp(0.3*dat$invtemp2)
+dat$po2_3b <- 3/exp(0.3*dat$invtemp2)
+
+##Impact on fish response
+#Calculate MI at two different temperatures
+invtemp1 <- (1 / boltz)  * ( 1 / (8 + 273.15) - 1 / (tref + 273.15))
+invtemp2 <- (1 / boltz)  * ( 1 / (15 + 273.15) - 1 / (tref + 273.15))
+#Oxygen
+po2 <- seq(0,10.5,by=0.1)
+mi1a <- po2*exp(Eo_1* invtemp1) 
+mi1b<- po2*exp(Eo_2* invtemp1)
+mi1c <- po2*exp(Eo_3* invtemp1)
+mi2a <- po2*exp(Eo_1* invtemp2) 
+mi2b<- po2*exp(Eo_2* invtemp2)
+mi2c <- po2*exp(Eo_3* invtemp2)
+#Temperature
+temp <- seq(5,17.5,by=0.5)
+invtemp <- (1 / boltz)  * ( 1 / (temp + 273.15) - 1 / (tref + 273.15))
+mi1b<- 1.7*exp(Eo_2* invtemp)
+mi1c <- 1.7*exp(Eo_3* invtemp)
+mi_true <- 1.7*exp(0.3*invtemp)
+
+#Response at each point
+#Extract a high s50
+predict3 <- subset(pars_wide2, pars_wide2$"mi-Eo">0)
+high_s50 <- predict3[which.max(predict3$"mi-s50"),]
+low_s50 <- pars_wide2[which.min(pars_wide2$"mi-s50"),]
+logmu1b <- logfun_basic(mi1b, smax, s50, delta)
+logmu1c <- logfun_basic(mi1c, smax, s50, delta)
+logmu2b <- logfun_basic(mi_true, smax, 1.2, delta)
+logmu2c <- logfun_basic(mi_true, smax, 3, delta)
+logtrue <- logfun_basic(mi_true, smax, s50, delta)
+
+
+#Combine
+preds <- as.data.frame(cbind(po2, mi2a, mi2b, mi2c, mi1a, mi1b, mi1c, logmu2a, logmu2b, logmu2c, logmu1a, logmu1b, logmu1c))
+preds <- as.data.frame(cbind(temp, mi2b, mi2c, mi1b, mi1c, logmu2b, logmu2c, logmu1b, logmu1c, logtrue))
+
+
+#Plot
+p2 <-ggplot(preds, aes(x=po2, y=logmu1b))+geom_line(colour="purple", size=1.5)+
+  geom_line(mapping=aes(x=po2, logmu1c),colour="gold", size=1.5)+
+  geom_line(mapping=aes(x=po2, logmu2b),colour="purple4",size=1.5)+
+  geom_line(mapping=aes(x=po2, logmu2c),colour="gold3", size=1.5)+
+  xlim(0,4.5)+
+  xlab("Dissolved Oxygen (kPa)")+
+  ylab(expression("Estimated"~f(phi[eco])))
+
+#Only change one parameter
+p2 <-ggplot(preds, aes(x=temp, y=logmu1b))+geom_line(colour="purple", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu1c),colour="purple4", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2b),colour="gold",size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2c),colour="gold3", size=1.5)+
+  geom_line(aes(x=temp, y=logtrue), linetype="dashed",  size=2)+
+  xlab("Temperature (C)")+
+  ylab(expression("Estimated"~f(phi[eco])))
+figure <- ggarrange(p1, p2,labels=c("A", "B"),
+                    ncol = 2, nrow = 1)
+
+#Keep pairs of parameter
+logmu1b <- logfun_basic(mi1b, smax_2, s50_2, delta_2)
+logmu1c <- logfun_basic(mi1c, smax_3, s50_2, delta_3)
+logtrue <- logfun_basic(mi1c, smax, s50, delta)
+
+preds <- as.data.frame(cbind(temp, mi2b, mi2c, mi1b, mi1c, logmu2b, logmu2c, logmu1b, logmu1c, logtrue))
+
+ggplot(preds, aes(x=temp, y=logmu1b))+geom_line(colour="purple", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu1c),colour="purple4", size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2b),colour="gold",size=1.5)+
+  geom_line(mapping=aes(x=temp, logmu2c),colour="gold3", size=1.5)+
+  geom_line(aes(x=temp, y=logtrue), linetype="dashed",  size=2)+
+  xlab("Temperature (C)")+
+  ylab(expression("Estimated"~f(phi[eco])))
+
+
+
+
+
+
+
+
+
+ggsave(
+  "figure_4.png",
+  plot = last_plot(),
+  device = NULL,
+  path = NULL,
+  scale = 1,
+  width = 30,
+  height = 8,
+  units = c("in"),
+  dpi = 600,
+  limitsize = TRUE
+)
+
+###Response on fish density
+
+#Make new oxygen and temperature data
+dat$temp2 <- runif(3304,10,16)
+dat$po22 <- runif(3304,0,10)
+invtemp2 <- (1 / boltz)  * ( 1 / ((dat$temp2) + 273.15) - 1 / (tref + 273.15))
+
+#Plot
+ggplot(dat, aes(x=temp, y=po2, colour=mi1a))+geom_point()+geom_point(data=dat, mapping=aes(x=temp2, y=po22, colour=mi2a))
+
+#Calculate metabolic index for original values and new values
+mi2a <- dat$po22*exp(Eo_1* invtemp2) 
+mi2b<- dat$po22*exp(Eo_2* invtemp2)
+mi2c <- dat$po22*exp(Eo_3* invtemp2)
+mi1a <- dat$po2*exp(Eo_1* invtemp)
+mi1b <- dat$po2*exp(Eo_2*invtemp)
+mi1c <- dat$po2*exp(Eo_3* invtemp)
+
+#Calculate response at new temperature
+logmu2a <- logfun_basic(mi2a, smax_1, s50_1, delta_1)
+logmu2b <- logfun_basic(mi2b, smax_2, s50_2, delta_2)
+logmu2c <- logfun_basic(mi2c, smax_3, s50_3, delta_3)
+logmu1a <- logfun_basic(mi1a, smax_1, s50_1, delta_1)
+logmu1b <- logfun_basic(mi1b, smax_2, s50_2, delta_2)
+logmu1c <- logfun_basic(mi1c, smax_3, s50_3, delta_3)
+
+#Plot
+preds <- as.data.frame(cbind(invtemp, invtemp2, mi2a, mi2b, mi2c, mi1a, mi1b, mi1c, logmu2a, logmu2b, logmu2c, logmu1a, logmu1b, logmu1c))
+ggplot(preds, aes(x=mi2a, y=logmu2a))+
+  geom_point(colour="orange")+
+  geom_point(aes(x=mi2b, y=logmu2b), colour="orange")+
+  geom_point(aes(x=mi2c, y=logmu2c), colour="orange")
+
+ggplot(preds, aes(x=mi1a, y=logmu1a))+
+  geom_point(colour="darkblue")+
+  geom_point(aes(x=mi1b, y=logmu1b),colour="darkblue")+
+  geom_point(aes(x=mi1c, y=logmu1c), colour="darkblue")+
+  xlim(0,12.5)
+
+ggplot(preds, aes(x=mi2a1, y=logmu3a))+
+  geom_line(colour="orange", linetype="dashed")+
+  geom_line(aes(x=mi2b1, y=logmu3b), colour="orange", linetype="dotted")+
+  geom_line(aes(x=mi2c1, y=logmu3c), colour="orange")+
+  geom_line(aes(x=mi1a, y=logmu1a), colour="darkblue", linetype="dashed")+
+  geom_line(aes(x=mi1b, y=logmu1b),colour="darkblue", linetype="dotted")+
+  geom_line(aes(x=mi1c, y=logmu1c), colour="darkblue")
+
+
+# How does uncertainty in s50 and Eo compare to uncertainty in other variables?
+
+#What is the proportion of iterations that the true value falls within the 95% confidence interval?
+##Coverage
+#How often does true parameter value fall within the range of the 95% CI
+#1 if true value is within confidence interval, 0 if not
+pars$within_95 <- case_when(pars$term=="mi-s50"~ifelse(pars$conf.low <s50 & pars$conf.high >s50, 1, 0),
+                            pars$term=="mi-delta"~ifelse(pars$conf.low <delta & pars$conf.high >delta, 1, 0),
+                            pars$term=="mi-smax"~ifelse(pars$conf.low <smax & pars$conf.high >smax, 1, 0),
+                            pars$term=="mi-Eo"& pars$model=="Typical Case, Unconstrained"~ifelse(pars$conf.low <Eo & pars$conf.high>Eo, 1, 0),
+                            pars$term=="mi-Eo"& pars$model=="Unusual Case, Unconstrained"~ifelse(pars$conf.low <Eo2 & pars$conf.high>Eo2, 1, 0),
+                            pars$term=="mi-Eo"& pars$model=="Typical Case, Prior Constrained"~ifelse(pars$conf.low <Eo & pars$conf.high>Eo, 1, 0),
+                            pars$term=="mi-Eo"& pars$model=="Unusual Case, Prior Constrained"~ifelse(pars$conf.low <Eo2 & pars$conf.high>Eo2, 1, 0),
+                            pars$term=="log_depth_sc"~ifelse(pars$conf.low <beta1 & pars$conf.high>beta1, 1, 0),
+                            pars$term=="log_depth_sc2"~ifelse(pars$conf.low <beta2 & pars$conf.high>beta2, 1, 0),
+                            pars$term=="range"~ifelse(pars$conf.low <range & pars$conf.high>range, 1, 0),
+                            pars$term=="sigma_O"~ifelse(pars$conf.low <sigma_O & pars$conf.high>sigma_O, 1, 0),
+                            pars$term=="phi"~ifelse(pars$conf.low <phi & pars$conf.high>phi, 1, 0),
+                            pars$term=="tweedie_p"~ifelse(pars$conf.low <p & pars$conf.high>p, 1, 0))
+#pars$term=="as.factor(year)2011"~ifelse(pars$conf.low <b_years[1] & pars$conf.high>b_years[1], 1, 0),
+#pars$term=="as.factor(year)2012"~ifelse(pars$conf.low <b_years[2] & pars$conf.high>b_years[2], 1, 0),
+#pars$term=="as.factor(year)2013"~ifelse(pars$conf.low <b_years[3] & pars$conf.high>b_years[3], 1, 0),
+#pars$term=="as.factor(year)2014"~ifelse(pars$conf.low <b_years[4] & pars$conf.high>b_years[4], 1, 0),
+#pars$term=="as.factor(year)2015"~ifelse(pars$conf.low <b_years[5] & pars$conf.high>b_years[5], 1, 0))
+
+count_within_95 <- aggregate(within_95 ~ term+model, pars, FUN=sum)
+count_within_95$proportion <- count_within_95$within_95/length(fits)
+
+#Average 95% range
+#95% range (upper 95% CI--lower 95% CI)
+pars$con.range <- pars$conf.high-pars$conf.low
+avg_conf.range <- aggregate(con.range ~ term+model, pars, FUN=mean)
+
+#Average standard error of each estimate (how does looking at internal model uncertainty serve as proxy?)
+sd_avg <- aggregate(std.error ~ term+model, pars, FUN=mean)
+
+###What is the estimated response across a range of pO2 values, given a low, medium, and high temperature
+
+
+
+
+
+
+
+###For the three extreme Eo examples, what is the range of uncertainty in predictions if the 95% confidence interval range is considered?
+pars_test <- subset(pars1, pars1$id==20)
+
+#Pull out lower and upper bounds
+s50_1 <- as.numeric(pars_test[9,3])
+Eo_1 <- as.numeric(pars_test[12,3])
+delta_1 <- as.numeric(pars_test[9,3])
+smax_1 <- as.numeric(pars_test[9,3])
+s50_2 <- as.numeric(pars_test[9,5])
+Eo_2 <-as.numeric(pars_test[12,5])
+s50_3 <- as.numeric(pars_test[9,6])
+Eo_3 <-as.numeric(pars_test[9,6])
+
+#Calculate metabolic index for original values and new values
+mi2a <- dat$po22*exp(Eo_1* invtemp2) 
+mi2b<- dat$po22*exp(Eo_2* invtemp2)
+mi2c <- dat$po22*exp(Eo_3* invtemp2)
+mi1a <- dat$po2*exp(Eo_1* invtemp)
+mi1b <- dat$po2*exp(Eo_2*invtemp)
+mi1c <- dat$po2*exp(Eo_3* invtemp)
+
+#Calculate response at original environmental conditions
+#Low s50, regular Eo
+logmu_s50a <- logfun_basic(mi1a, smax_1, s50_2, delta_1)
+#High s50, regular
+logmu_s50b <- logfun_basic(mi1a, smax_1, s50_3, delta_1)
+#Regular s50, low Eo
+logmu_Eoa <- logfun_basic(mi1b, smax_1, s50_1, delta_1)
+#Regular s50, high Eo
+logmu_Eob <- logfun_basic(mi1c, smax_1, s50_1, delta_1)
+
+preds <- as.data.frame(cbind(mi1a, mi1b, mi1c, logmu_s50a, logmu_s50b, logmu_Eoa,logmu_Eob))
+
+ggplot(preds, aes(x=mi1a, y=logmu_s50a))+geom_point(colour="blue")+
+  geom_point(mapping=aes(x=mi1a, y=logmu_s50b), colour="blue")+
+  geom_point(mapping=aes(x=mi1b, y=logmu_Eoa), colour="red")+
+  geom_point(mapping=aes(x=mi1c, y=logmu_Eob), colour="red")
+
+
+#Regular s50, high MI
+logmu2b <- logfun_basic(mi2b, smax_2, s50_2, delta_2)
+logmu2c <- logfun_basic(mi2c, smax_3, s50_3, delta_3)
+logmu1a <- logfun_basic(mi1a, smax_1, s50_1, delta_1)
+logmu1b <- logfun_basic(mi1b, smax_2, s50_2, delta_2)
+logmu1c <- logfun_basic(mi1c, smax_3, s50_3, delta_3)
+
+
+
+#Flip to make plotting easier
+preds2 <- pivot_longer(preds,2:5)
+
+#Plot
+p2 <- ggplot(preds2, aes(x=po2, y=value))+geom_line(aes(colour=name), size=1.5)+
+  xlab("Dissolved Oxygen (kPa)")+
+  ylab(expression("Estimated"~f(phi[eco])))+
+  scale_colour_manual(values=c("blue2", "skyblue2", "orange2", "gold"), labels=c("High Eo&s50, High Temp", "High Eo&s50, Low Temp", "Low Eo&s50, High Temp", "Low Eo&s50, Low Temp"))+
+  geom_line(preds2, mapping=aes(x=po2, logtrue1),linetype="dotted",size=1.5)+
+  geom_line(preds2, mapping=aes(x=po2, logtrue2),linetype="dashed",size=1.5)+
+  theme(legend.position=c(0.8, 0.2))
+
+ggsave(
+  "figure_2_pars_effect_obs.png",
+  plot = last_plot(),
+  device = NULL,
+  path = NULL,
+  scale = 1,
+  width = 24,
+  height = 6,
+  units = c("in"),
+  dpi = 600,
+  limitsize = TRUE
+)
+
+#Calculate percent differences
+preds2$diff <- case_when(preds2$name=="logmu1_low"|preds2$name=="logmu2_low"~preds2$value-preds2$logtrue1,
+                         preds2$name=="logmu1_high"|preds2$name=="logmu2_high"~preds2$value-preds2$logtrue2)
+
+
+
+p2 <- ggplot(preds2, aes(x=po2, y=diff))+geom_line(aes(colour=name), size=1.5)+
+  xlab("Dissolved Oxygen (kPa)")+
+  ylab(expression("Difference in"~f(phi[eco])))+
+  scale_colour_manual(values=c("blue2", "skyblue2", "orange2", "gold"), labels=c("High Eo&s50, High Temp", "High Eo&s50, Low Temp", "Low Eo&s50, High Temp", "Low Eo&s50, Low Temp"))+
+  #geom_line(preds2, mapping=aes(x=po2, logtrue),linetype="dashed",size=1.5)+
+  theme(legend.position=c(0.8, 0.5))

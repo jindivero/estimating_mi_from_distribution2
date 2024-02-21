@@ -33,7 +33,7 @@ all within the estimation model of a generalized linear mixed model, i.e. simult
 
 For further details on the equations of the metabolic index and the form of the threshold function, see Indivero et al. (in prep).
 
-Here, we will use as an example the data for sablefish (*Anoplopoma fimbria*) from Indivero et al. This data is from 2010-2015 of the National Oceanic and Atmospheric Administration West Coast Bottom Trawl Survey ([Keller et al. 2017])(https://repository.library.noaa.gov/view/noaa/14179), spanning Washington, Oregon, and California of the California Current. 
+Here, we will use as an example the data for sablefish (*Anoplopoma fimbria*) from Indivero et al. This data is from 2010-2015 of the National Oceanic and Atmospheric Administration West Coast Bottom Trawl Survey ([Keller et al. 2017](https://repository.library.noaa.gov/view/noaa/14179)), spanning Washington, Oregon, and California of the California Current. 
 
 ## Downloading the branch
 Currently, this feature is included in a separate branch of sdmTMB, called "sdmTMB-newlogistic". To install the package in R:
