@@ -33,18 +33,15 @@ library(viridis)
 library(ggpubr)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 35))
+theme_set(theme_bw(base_size = 20))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-
-### load helper functions ####
-source("Code/util_funs.R")
-source("Code/sim_funs.R")
 
 #Load data and models if needed
 use_previous <- T
 if(use_previous){
   simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
   simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
+  load("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/model_fits_mis.Rdata")
 }
 
 # Set parameter values for data generation and model fitting #
@@ -61,6 +58,10 @@ phi <- 10 # 16 corresponds to sablefish
 p <- 1.51
 range <- 85
 sigma_O <- 1.77
+
+### load helper functions ####
+source("Code/util_funs.R")
+source("Code/sim_funs.R")
 
 ## Set how many data sets to produce ##
 n <- 250
@@ -102,19 +103,13 @@ dat$year <- as.factor(dat$year)
 ## Make mesh ##
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 #Set starting values
-start <- matrix(0, ncol = 1, nrow = 4)
-start[1,1] <- s50
-start[2,1] <- delta
-start[3,1] <- smax
-start[4,1] <- Eo
-
+start <- matrix(c(1,1,1000,-0.3), ncol = 1, nrow = 4)
 start_unusual <- start
-start_unusual[4,1] <- Eo2
 
 ### Fit mis-specified depth model ###
-fits2_mis <- lapply(simdat, run_sdmTMB_prior_misspecified, 
+fits2_mis <- lapply(simdat, run_sdmTMB_misspecified_noprior, 
                     start=start, mesh=mesh)
-fits4_mis <- lapply(simdat2, run_sdmTMB_prior_misspecified, 
+fits4_mis <- lapply(simdat2, run_sdmTMB_misspecified_noprior, 
                     start=start_unusual, mesh=mesh)
 
 save <- T
@@ -265,34 +260,24 @@ s50_performance <- subset(par_performance, Parameter=="mi-s50")
 
 ### Plot parameter estimates ###
 #Density plot just Eo #
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
+p1 <- ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
   geom_vline(data = Eo_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
   geom_vline(data = Eo_values, aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
-  xlab("Eo estimate") + 
-  theme(strip.text = element_text(size = 14))
-
-#Add prior distribution
-ggplot(subset(pars, pars$term=="mi-Eo"), aes(x=estimate)) +
-  geom_density(fill="lightblue", adjust = 1.5) +
-  geom_vline(data = Eo_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
-  geom_vline(data = Eo_values, aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
-  xlab("Eo estimate") + 
-  theme(strip.text = element_text(size = 14))+
-  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed", geom="area", alpha=0.2)+
-  stat_function(fun = dnorm, n = n, args = list(mean = 0.3477, sd = 0.1455), linetype="dashed")+
-  ylab("Density of data simulations")
+  facet_wrap("data")+
+  xlab("Eo Maximum Likelihood Estimate") + 
+  ylab("Estimated Probability Density")+
+  xlim(-1,1)
 
 # Density plot s50 #
-ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
+p2 <- ggplot(subset(pars, pars$term=="mi-s50"), aes(x=estimate)) +
   geom_density(fill="lightblue", adjust = 1.5) +
   geom_vline(data = s50_values, aes(xintercept = MLE_avg),linetype="dashed", size=1.2, color="darkorange", show.legend=T)+
   geom_vline(data = s50_values, aes(xintercept = true),linetype="dashed", size=1.2)+
-  facet_grid(analysis~data)+
+  facet_wrap("data")+
   xlab("s50 Maximum Likelihood Estimate")+
-  ylab("Density of iterations")
+  ylab("Estimated Probablity Density")+
+  theme(strip.text=element_blank())
 
 #### Comparing po2' effect from parameter estimates ####
 #calculate the po2' estimated from the Eo, use that to calculate f(po2')
@@ -324,27 +309,36 @@ simdats2$side <- "Misspecified"
 q1 <- ggplot(simdats1, aes(mi_usual, logmu, colour=Eo)) +
   geom_point(size=0.1)+
   scale_colour_viridis()+
-  xlab("True pO2'")+
-  ylab("Estimated pO2' effect")+
-  theme(legend.position=c(0.9,0.2))+
+  theme(legend.position=c(0.7,0.4))+
   geom_line(data=true_effect, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank())+
-  facet_wrap("title")
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())
 q2 <- ggplot(simdats2, aes(mi_weird, logmu, colour=Eo)) +
   geom_point(size=0.1)+
   scale_colour_viridis()+
-  xlab("True pO2'")+
-  ylab("Estimated pO2' effect")+
-  theme(legend.position=c(0.9,0.2))+
+  theme(legend.position = c(0.7,0.4))+
   geom_line(data=true_effect, aes(x=mi, y=mi_effect), color="black", linetype="dashed", size=2)+
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank())+
-  facet_grid(side~title)
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())
 
 
-figure2 <- ggarrange(q1,q2,
-                     common.legend = TRUE, legend = "right")
+figure2 <- ggarrange(q1,q2, ncol=2,nrow=1)
 
-annotate_figure(figure2, left=text_grob(expression(paste("pO"[2], "'", " Effect")), size=30, rot=90),bottom=text_grob(expression(paste("pO"[2], "'", " True Value")), size=30))
+figure2 <- annotate_figure(figure2, left=text_grob(expression("Observed"~phi[eco]), size=20, rot=90), bottom=text_grob(expression("Estimated"~"f"(phi[eco])), size=20))
+
+figure_s5 <- ggarrange(p1,p2,figure2, labels=c("A", "B", "C"), ncol=1,nrow=3)
+
+ggsave(
+  "figure_S5.png",
+  plot = last_plot(),
+  device = NULL,
+  path = NULL,
+  scale = 1,
+  width = 15,
+  height = 15,
+  units = c("in"),
+  dpi = 600,
+  limitsize = TRUE
+)
+
 
 ###Calculate RMSE ####
 simdats1$true <- true_effect$mi_effect
@@ -359,6 +353,7 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 rmse1 <- mean(rmse$rmse)
+rmse1a <- sd(rmse$rmse)
 
 simdats2$error <- simdats2$logmu-simdats2$true
 simdats2$error2 <- simdats2$error^2
@@ -369,5 +364,6 @@ rmse$rmse <- sqrt(rmse$error2/rmse$n)
 rmse$n <- NULL
 rmse$error2 <- NULL
 rmse2a <- mean(rmse$rmse)
+rmse2b <- sd(rmse$rmse)
 
 

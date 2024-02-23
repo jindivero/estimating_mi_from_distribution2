@@ -4,8 +4,23 @@ install.packages("ggbeeswarm")
 library(ggbeeswarm)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 30))
+theme_set(theme_bw(base_size = 35))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+# Set parameter values for data generation and model fitting #
+s50 <-2 # same as sablefish= 0.88; had been 2 in previous data simulation
+delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
+smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
+Eo <- 0.3
+Eo2 <- 0.7
+
+b_years <- rnorm(n = 6, mean = 4, sd = 1)
+beta1 <- 1.5
+beta2 <- -1
+phi <- 10 # 16 corresponds to sablefish 
+p <- 1.51
+range <- 85
+sigma_O <- 1.77
 
 ### load helper functions ####
 source("Code/util_funs.R")
@@ -18,7 +33,7 @@ if(use_previous==T){
 }
 
 #Load data, start, mesh
-mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
+mesh <- make_mesh(simdat[[1]], xy_cols = c("X", "Y"), n_knots=250)
 
 start <- matrix(0, ncol = 1, nrow = 4)
 start[1,1] <- s50
@@ -31,63 +46,100 @@ start_unusual[4,1] <- Eo2
 
 compare1 <- lapply(simdat, run_alt_models, start, mesh)
 compare2 <- lapply(simdat2, run_alt_models, start_unusual, mesh)
-compare3 <- lapply(simdat, run_alt_models_mis, start, mesh)
-compare4 <- lapply(simdat2, run_alt_models_mis, start_unusual, mesh)
 
 if(save){
-  save(compare1, compare2, compare3, compare4, file="AIC.Rdata")
+  save(compare1, compare2, file="AIC.Rdata")
 }
 if(use_previous){
-  load("simulation_AIC.R")
+  load("Model Outputs/simulation_AIC.R")
 }
 # Combine #
 AIC1 <- keep(.x=compare1, .p=is.data.frame)
 AIC1 <- bind_rows(compare1, .id="df")
-AIC1$model <- rep(1:9, 100) 
 
 AIC2 <- keep(.x=compare2, .p=is.data.frame)
 AIC2 <- bind_rows(compare2, .id="df")
-AIC2$model <- rep(1:9, 100) 
+
+#Average and SD AIC
+AIC_summary <- aggregate(dAIC~model, data=AIC1, FUN=mean)
+AIC_summary1a <- aggregate(dAIC~model, data=AIC1, FUN=sd)
+AIC_summary1b <- aggregate(dAIC~model, data=AIC1, FUN=fivenum)
+
+AIC_summary2 <- aggregate(dAIC~model, data=AIC2, FUN=mean)
+AIC_summary2a <- aggregate(dAIC~model, data=AIC2, FUN=sd)
+
+#Count best-fitting in each model type
+AIC_count1 <- subset(AIC1, AIC1$dAIC==0)
+AIC_count2 <- subset(AIC2, AIC2$dAIC==0)
+AIC_count1 <- aggregate(df~model, data=AIC_count1, FUN=length)
+AIC_count2 <- aggregate(df~model, data=AIC_count2, FUN=length)
+
+#Get list of data iterations that had estimation issues
+AIC_na <- subset(AIC1, AIC1$model=="Eo estimation and logistic po2' (no prior)"&is.na(AIC1$dAIC))
+nas <- as.vector(as.numeric(AIC_na$df))
+AIC_na2 <- subset(AIC2, AIC2$model=="Eo estimation and logistic po2' (no prior)"&is.na(AIC2$dAIC))
+nas2 <- as.vector(as.numeric(AIC_na2$df))
+
+#Isolate data iterations 
+simdat_na <- simdat[nas]
+simdat2_na <- simdat[nas2]
+
+#Run alternative models including prior
+#Try different start
+starta <- start*0.9
+start_unusuala <- start_unusual*0.9
+compare1a <- lapply(simdat_na, run_alt_models_prior, start, mesh)
+compare2a <- lapply(simdat2_na, run_alt_models_prior, start_unusual, mesh)
+
+#Get average, sd, counts like above
+AIC1a <- keep(.x=compare1a, .p=is.data.frame)
+AIC1a <- bind_rows(compare1a, .id="df")
+
+AIC2a <- keep(.x=compare2a, .p=is.data.frame)
+AIC2a <- bind_rows(compare2a, .id="df")
+
+#Average and SD AIC
+AIC_summarya <- aggregate(dAIC~model, data=AIC1a, FUN=mean)
+AIC_summary1aa <- aggregate(dAIC~model, data=AIC1a, FUN=sd)
+
+AIC_summary2a <- aggregate(dAIC~model, data=AIC2a, FUN=mean)
+AIC_summary2aa <- aggregate(dAIC~model, data=AIC2a, FUN=sd)
+
+#Count best-fitting in each model type
+AIC_count1a <- subset(AIC1a, AIC1a$dAIC==0)
+AIC_count2a <- subset(AIC2a, AIC2a$dAIC==0)
+AIC_count1a <- aggregate(df~model, data=AIC_count1a, FUN=length)
+AIC_count2a <- aggregate(df~model, data=AIC_count2a, FUN=length)
+
+### Mis-specified
+#Count best-fitting model of each type
+start <- matrix(c(1,1,1000,-0.3), ncol = 1, nrow = 4)
+compare3 <- lapply(simdat, run_alt_models_mis, start, mesh)
+compare4 <- lapply(simdat2, run_alt_models_mis, start, mesh)
+
+save(compare3, compare4, file="AIC_mis.Rdata")
 
 AIC3 <- keep(.x=compare3, .p=is.data.frame)
 AIC3 <- bind_rows(compare3, .id="df")
-AIC3$model <- rep(c(1,3,4,5,6,7,8,9), 100) 
 
 AIC4 <- keep(.x=compare4, .p=is.data.frame)
 AIC4 <- bind_rows(compare4, .id="df")
-AIC4$model <- rep(c(1,3,4,5,6,7,8,9), 100) 
-
-# Plot
-ggplot(AIC1, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))+theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+scale_color_discrete(labels=c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2"))
-ggplot(AIC2, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
-ggplot(AIC3, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
-ggplot(AIC4, aes(x=df, y=dAIC))+geom_line(aes(color=as.factor(model), group=as.factor(model)))
-
-ggplot(AIC1, aes(x=df, y=dAIC))+geom_col(aes(color=as.factor(model), group=as.factor(model)))+theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())+scale_color_discrete(labels=c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2"))
-
-
-#Average AIC
-AIC_summary <- aggregate(dAIC~model, data=AIC1, FUN=mean)
-AIC_summary$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
-
-AIC_summary2 <- aggregate(dAIC~model, data=AIC2, FUN=mean)
-AIC_summary2$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (no prior)","Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
 
 AIC_summary3 <- aggregate(dAIC~model, data=AIC3, FUN=mean)
-AIC_summary3$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
-
 AIC_summary4 <- aggregate(dAIC~model, data=AIC4, FUN=mean)
-AIC_summary4$models <- c("breakpt-pO2", "Eo estimation and logistic po2' (prior)","logistic-pO2", "Null", "temp", "po2", "temp+po2", "temp * po2")
+AIC_summary3a <- aggregate(dAIC~model, data=AIC3, FUN=sd)
+AIC_summary4a <- aggregate(dAIC~model, data=AIC4, FUN=sd)
 
-#Count best-fitting model of each type
-AIC_count1 <- subset(AIC1, AIC1$dAIC==0)
-AIC_count2 <- subset(AIC2, AIC2$dAIC==0)
 AIC_count3 <- subset(AIC3, AIC3$dAIC==0)
 AIC_count4 <- subset(AIC4, AIC4$dAIC==0)
-AIC_count1 <- aggregate(df~model, data=AIC_count1, FUN=length)
-AIC_count2 <- aggregate(df~model, data=AIC_count2, FUN=length)
 AIC_count3 <- aggregate(df~model, data=AIC_count3, FUN=length)
 AIC_count4 <- aggregate(df~model, data=AIC_count4, FUN=length)
+
+
+
+
+
+
 
 ###Cross-validation ###
 

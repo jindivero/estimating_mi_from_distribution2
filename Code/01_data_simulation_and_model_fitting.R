@@ -1,11 +1,11 @@
 #### Simulating data from sablefish trawl data ####
 
 ### Install Packages ###
-#install.packages("remotes")
+install.packages("remotes")
 library(remotes)
-#install.packages("devtools")
+install.packages("devtools")
 library(devtools)
-#install.packages("pkgbuild")
+install.packages("pkgbuild")
 library(pkgbuild)
 remotes::install_github("pbs-assess/sdmTMB", dependencies = TRUE,  ref="newlogistic")
 library(sdmTMB)
@@ -32,10 +32,28 @@ library(tweedie)
 #install.packages("ggridges")
 library(ggridges)
 library(viridis)
+install.packages("rnaturalearthdata")
+library(rnaturalearthdata)
+library(rnaturalearth)
 
 ### Set ggplot themes ###
-theme_set(theme_bw(base_size = 30))
+theme_set(theme_bw(base_size = 35))
 theme_update(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+##Set parameter values for data generation and model fitting ###
+s50 <-2 # same as sablefish= 0.88; had been 2 in previous data simulation
+delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
+smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
+Eo <- 0.3
+Eo2 <- 0.7
+
+b_years <- rnorm(n = 6, mean = 4, sd = 1)
+beta1 <- 1.5
+beta2 <- -1
+phi <- 10 # 16 corresponds to sablefish 
+p <- 1.51
+range <- 85
+sigma_O <- 1.77
 
 ### load helper functions ####
 source("Code/util_funs.R")
@@ -70,20 +88,6 @@ dat$cpue_kg_km2 <- dat$cpue_kg_km2 * (dat$p2+dat$p3)
 dat$year <- as.factor(dat$year)
 
 ### Fish density distribution simulation ####
-##Set parameter values for data generation and model fitting ###
-s50 <-2 # same as sablefish= 0.88; had been 2 in previous data simulation
-delta <- 2 #same as sablefish = 0.57; had been 2 in previous data simulation
-smax <- 30 # maximum effect of MI; had been 4 in previous data simulation
-Eo <- 0.3
-Eo2 <- 0.7
-
-b_years <- rnorm(n = 6, mean = 4, sd = 1)
-beta1 <- 1.5
-beta2 <- -1
-phi <- 10 # 16 corresponds to sablefish 
-p <- 1.51
-range <- 85
-sigma_O <- 1.77
 
 ## Set how many data sets to produce ##
 n <- 250
@@ -100,7 +104,7 @@ model.pars <- list(b_years = b_years,
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), n_knots=250)
 
 ### Simulate data under typical Eo ####
-use_previous <- F
+use_previous <- T
 if(use_previous){
   simdat <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_usual.rds")
  simdat2 <- readRDS("~/Dropbox/GitHub/estimating_mi_from_distribution2/Model Outputs/data_sims_weird.rds")
@@ -131,7 +135,35 @@ if(sanity){
 sim_test <- simdat[[1]]
 sim_test2 <- simdat2[[1]]
 
-ggplot(dat, aes(x=po2_s,y=cpue_kg_km2))+geom_point(size=0.6)+geom_point(sim_test, mapping=aes(x=po2_s, y=sim), color="blue", size=0.6)
+#Plot S1 Comparison of density data for one simulated dataset and real data for each year
+ggplot(dat, aes(x=po2,y=log(cpue_kg_km2)))+
+  geom_point()+
+  geom_point(sim_test, mapping=aes(x=po2, y=log(sim)), colour="blue", alpha=0.4)+
+  facet_wrap("year", ncol=2)+
+  labs(x = "Partial Pressure of Oxygen (kPa)", y = bquote('Population Density'~(kg~km^-2)))
+
+#Plot map
+map_data <-ne_countries(
+  scale = "medium",
+  returnclass = "sf", country = c("United States of America"))
+# Crop the polygon for plotting and efficiency:
+base_map <- suppressWarnings(suppressMessages(
+  sf::st_crop(map_data,
+              c(xmin = -134, ymin = 34, xmax = -120, ymax = 50))))
+base_map_proj <- sf::st_transform(base_map, crs = "+proj=utm +zone=10 +datum=WGS84 +units=km")
+
+ggplot(base_map_proj)+
+  geom_sf()+
+  geom_point(sim_test, mapping=aes(x=X, y=Y, colour=log(sim+1)), size=0.5)+
+  theme_bw(base_size=12)+
+  facet_wrap("year", ncol=2)+
+  scale_colour_viridis()+
+  labs(colour="log (simulated \n catch density)")+
+  theme(axis.text.x = element_text(angle=90, hjust=1))+
+  xlab("Longitude")+
+  ylab("Latitude")
+
+
 
 #Percent below threshold
 sim_test3 <- subset(sim_test, sim_test$mi_usual <s50)

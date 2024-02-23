@@ -1,5 +1,6 @@
 library(sp)
 library(ggplot2)
+if (!require("broom")) install.packages("broom")
 library(broom)
 library(dplyr)
 library(tidyr)
@@ -14,8 +15,9 @@ if (!require("here")) install.packages("here")
 library(here)
 if (!require("gsw")) install.packages("gsw")
 library(gsw)
-  
-  
+if (!require("modelr")) install.packages("modelr")
+library(modelr)
+
 # calc o2 solubility, relies on o2 in umol/kg
 gsw_O2sol_SP_pt <- function(sal,pt) {
   x = sal
@@ -330,6 +332,16 @@ logfun <- function(x, model, mi = F) {
   
   return(logmu)
 } 
+
+logfun_basic <- function(mi, smax, s50, s95){
+  delta <- s95-s50
+  a <- log(smax / (log(0.5) + smax) - 1)
+  b <- log(smax / (log(0.95) + smax) - 1)
+  beta0 <- -a + s50 * (b - a) / delta
+  beta1 <- (a - b) / delta
+  logmu <- exp(smax * (1 / ( 1 + exp( - beta0 - beta1 * mi)) -1))
+  return(logmu)
+}
 
 getEo <- function(model) {
   parfit <- model$sd_report
