@@ -1,7 +1,23 @@
-library(knitr)
-opts_chunk$set(dev="png")
+---
+output: 
+  github_document:
+    includes:
+      in_header: header.md
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "figures/README-",
+  out.width = "50%",
+  cache = FALSE,
+  dpi = 72
+)
+```
 
 ## Purpose
+
 This vignette is to provide guidance on using an optional estimation feature +logistic(mi) added to model equation using  sdmTMB() developed and used in Indivero et al. (in prep). This feature is specifically designed for using spatial data on oxygen, temperature, and marine species density to estimate both:
 
 1. The metabolic index, with an estimated parameter Eo
