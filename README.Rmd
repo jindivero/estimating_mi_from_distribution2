@@ -8,7 +8,7 @@ output:
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.path = "figures/README-",
+  fig.path = "Figures/README-",
   out.width = "50%",
   cache = FALSE,
   dpi = 72

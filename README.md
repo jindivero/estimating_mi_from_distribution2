@@ -343,7 +343,7 @@ ggplot(dat, aes(x = metabolic_index, y = effect)) +
   geom_point()
 ```
 
-<img src="figures/README-marginal effect-1.png" width="50%" />
+<img src="Figures/README-marginal effect-1.png" width="50%" />
 
 ### Threshold oxygen level across temperatures
 
@@ -362,7 +362,7 @@ ggplot(dat, aes(x = invtemp, y = po2_s50)) +
   geom_point()
 ```
 
-<img src="figures/README-threshold-1.png" width="50%" />
+<img src="Figures/README-threshold-1.png" width="50%" />
 
 ``` r
 
@@ -371,4 +371,4 @@ ggplot(dat, aes(x = temp, y = po2_s50)) +
   geom_point()
 ```
 
-<img src="figures/README-threshold-2.png" width="50%" />
+<img src="Figures/README-threshold-2.png" width="50%" />
